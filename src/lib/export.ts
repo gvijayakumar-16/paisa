@@ -1,5 +1,25 @@
-import type { BalancedPosting } from "./utils";
+import type { AssetBreakdown, BalancedPosting } from "./utils";
 import Papa from "papaparse";
+
+export function downloadAssets(breakdowns: Record<string, AssetBreakdown>) {
+  const rows = Object.values(breakdowns).map((b) => ({
+    Account: b.group,
+    "Investment Amount": b.investmentAmount,
+    "Withdrawal Amount": b.withdrawalAmount,
+    "Balance Units": b.balanceUnits,
+    "Avg Buy Price": b.averageBuyPrice,
+    "Market Value": b.marketAmount,
+    Change: b.gainAmount,
+    XIRR: b.xirr,
+    "Absolute Return": b.absoluteReturn
+  }));
+
+  const csv = Papa.unparse(rows);
+  const link = document.createElement("a");
+  link.href = window.URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
+  link.download = "paisa-assets-balance.csv";
+  link.click();
+}
 
 export function download(balancedPostings: BalancedPosting[]) {
   const rows = balancedPostings.map((balancedPosting) => {

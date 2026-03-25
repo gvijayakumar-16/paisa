@@ -41,6 +41,12 @@
       hozAlign: "right",
       formatter: nonZeroCurrency
     },
+    {
+      title: "Avg Buy Price",
+      field: "averageBuyPrice",
+      hozAlign: "right",
+      formatter: nonZeroCurrency
+    },
     { title: "Market Value", field: "marketAmount", hozAlign: "right", formatter: nonZeroCurrency },
     { title: "Change", field: "gainAmount", hozAlign: "right", formatter: formatCurrencyChange },
     { title: "XIRR", field: "xirr", hozAlign: "right", formatter: nonZeroFloatChange },

@@ -174,6 +174,7 @@ export interface AssetBreakdown {
   xirr: number;
   gainAmount: number;
   absoluteReturn: number;
+  averageBuyPrice: number;
 }
 
 export interface LiabilityBreakdown {

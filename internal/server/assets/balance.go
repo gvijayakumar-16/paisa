@@ -25,6 +25,7 @@ type AssetBreakdown struct {
 	XIRR             decimal.Decimal `json:"xirr"`
 	GainAmount       decimal.Decimal `json:"gainAmount"`
 	AbsoluteReturn   decimal.Decimal `json:"absoluteReturn"`
+	AverageBuyPrice  decimal.Decimal `json:"averageBuyPrice"`
 }
 
 func GetCheckingBalance(db *gorm.DB) gin.H {
@@ -96,6 +97,7 @@ func ComputeBreakdown(db *gorm.DB, ps []posting.Posting, leaf bool, group string
 	})
 	marketAmount := accounting.CurrentBalance(psWithoutCapitalGains)
 	var balanceUnits decimal.Decimal
+	var boughtUnits decimal.Decimal
 	if leaf {
 		balanceUnits = lo.Reduce(ps, func(acc decimal.Decimal, p posting.Posting, _ int) decimal.Decimal {
 			if !utils.IsCurrency(p.Commodity) {
@@ -103,6 +105,17 @@ func ComputeBreakdown(db *gorm.DB, ps []posting.Posting, leaf bool, group string
 			}
 			return decimal.Zero
 		}, decimal.Zero)
+		boughtUnits = lo.Reduce(ps, func(acc decimal.Decimal, p posting.Posting, _ int) decimal.Decimal {
+			if !utils.IsCurrency(p.Commodity) && p.Quantity.GreaterThan(decimal.Zero) && !service.IsStockSplit(db, p) {
+				return acc.Add(p.Quantity)
+			}
+			return acc
+		}, decimal.Zero)
+	}
+
+	averageBuyPrice := decimal.Zero
+	if boughtUnits.GreaterThan(decimal.Zero) {
+		averageBuyPrice = investmentAmount.Div(boughtUnits)
 	}
 
 	xirr := service.XIRR(db, ps)
@@ -121,5 +134,6 @@ func ComputeBreakdown(db *gorm.DB, ps []posting.Posting, leaf bool, group string
 		BalanceUnits:     balanceUnits,
 		GainAmount:       gainAmount,
 		AbsoluteReturn:   absoluteReturn,
+		AverageBuyPrice:  averageBuyPrice,
 	}
 }
