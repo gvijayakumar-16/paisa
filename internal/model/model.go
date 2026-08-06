@@ -38,6 +38,12 @@ func SyncJournal(db *gorm.DB) (string, error) {
 	AutoMigrate(db)
 	log.Info("Syncing transactions from journal")
 
+	// ValidateFile/Prices/Parse are run sequentially, not concurrently -
+	// tried overlapping ValidateFile with Prices+Parse (both spawn heavy
+	// `ledger` subprocesses that re-parse the whole journal), but on a
+	// real large journal they contend for the same CPU instead of
+	// overlapping cleanly: both got slower running at the same time,
+	// canceling out the theoretical win. Sequential measured faster.
 	errors, _, err := ledger.Cli().ValidateFile(config.GetJournalPath())
 	if err != nil {
 
@@ -63,6 +69,7 @@ func SyncJournal(db *gorm.DB) (string, error) {
 	if err != nil {
 		return err.Error(), err
 	}
+
 	posting.UpsertAll(db, postings)
 
 	return "", nil

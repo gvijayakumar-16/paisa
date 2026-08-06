@@ -61,17 +61,33 @@ func ComputeBreakdowns(db *gorm.DB, postings []posting.Posting, rollup bool) map
 
 	}
 
-	result := make(map[string]AssetBreakdown)
+	// Group postings by every account-path prefix that is a key in
+	// `accounts`, in a single O(postings) pass - replaces re-filtering the
+	// full posting list once per group (previously O(accounts x postings)),
+	// which dominated Assets page load time on large ledgers. Same
+	// same-or-parent prefix test as before (utils.IsSameOrParent), just
+	// walked forward from each posting instead of backward from each
+	// group, and order-preserving per group like the original lo.Filter.
+	grouped := make(map[string][]posting.Posting)
+	for _, p := range postings {
+		account := p.Account
+		if service.IsCapitalGains(p) {
+			account = service.CapitalGainsSourceAccount(p.Account)
+		}
 
-	for group, leaf := range accounts {
-		ps := lo.Filter(postings, func(p posting.Posting, _ int) bool {
-			account := p.Account
-			if service.IsCapitalGains(p) {
-				account = service.CapitalGainsSourceAccount(p.Account)
+		var parts []string
+		for _, part := range strings.Split(account, ":") {
+			parts = append(parts, part)
+			key := strings.Join(parts, ":")
+			if _, ok := accounts[key]; ok {
+				grouped[key] = append(grouped[key], p)
 			}
-			return utils.IsSameOrParent(account, group)
-		})
-		result[group] = ComputeBreakdown(db, ps, leaf, group)
+		}
+	}
+
+	result := make(map[string]AssetBreakdown)
+	for group, leaf := range accounts {
+		result[group] = ComputeBreakdown(db, grouped[group], leaf, group)
 	}
 
 	return result

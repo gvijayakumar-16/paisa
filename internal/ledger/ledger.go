@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"encoding/csv"
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 
 	"strconv"
 	"time"
@@ -86,21 +88,42 @@ func (LedgerCLI) ValidateFile(journalPath string) ([]LedgerFileError, string, er
 }
 
 func (LedgerCLI) Parse(journalPath string, _prices []price.Price) ([]*posting.Posting, error) {
-	var postings []*posting.Posting
+	// The normal and budget passes are independent CLI invocations, each
+	// re-parsing the whole journal - run them concurrently instead of
+	// back to back. The budget pass is additionally skipped outright when
+	// the journal has no periodic transactions (`~` directives) at all,
+	// since ledger's --budget can only ever produce output from those -
+	// running the subprocess just to get 0 records back is pure waste.
+	var postings, budgetPostings []*posting.Posting
+	var postingsErr, budgetErr error
+	var wg sync.WaitGroup
 
-	postings, err := execLedgerCommand(journalPath, []string{})
+	needsBudget := hasPeriodicTransactions(journalPath)
 
-	if err != nil {
-		return nil, err
+	wg.Add(1)
+	if needsBudget {
+		wg.Add(1)
 	}
+	go func() {
+		defer wg.Done()
+		postings, postingsErr = execLedgerCommand(journalPath, []string{})
+	}()
+	if needsBudget {
+		go func() {
+			defer wg.Done()
+			budgetPostings, budgetErr = execLedgerCommand(journalPath, []string{"--now", strconv.Itoa(utils.Now().Year() + 3), "--budget"})
+			budgetPostings = lo.Filter(budgetPostings, func(p *posting.Posting, _ int) bool {
+				return p.Payee == "Budget transaction"
+			})
+		}()
+	}
+	wg.Wait()
 
-	budgetPostings, err := execLedgerCommand(journalPath, []string{"--now", strconv.Itoa(utils.Now().Year() + 3), "--budget"})
-	budgetPostings = lo.Filter(budgetPostings, func(p *posting.Posting, _ int) bool {
-		return p.Payee == "Budget transaction"
-	})
-
-	if err != nil {
-		return nil, err
+	if postingsErr != nil {
+		return nil, postingsErr
+	}
+	if budgetErr != nil {
+		return nil, budgetErr
 	}
 
 	return append(postings, budgetPostings...), nil
@@ -168,22 +191,43 @@ func (HLedgerCLI) ValidateFile(journalPath string) ([]LedgerFileError, string, e
 }
 
 func (HLedgerCLI) Parse(journalPath string, prices []price.Price) ([]*posting.Posting, error) {
-	var postings []*posting.Posting
-
-	postings, err := execHLedgerCommand(journalPath, prices, []string{})
-	if err != nil {
-		return nil, err
-	}
+	// The normal and forecast passes are independent CLI invocations, each
+	// re-parsing the whole journal - run them concurrently instead of
+	// back to back. Both use the same already-resolved `prices` snapshot.
+	// The forecast pass is skipped outright when the journal has no
+	// periodic transactions (`~` directives) at all, since --forecast's
+	// generated transactions can only ever come from those.
+	var postings, budgetPostings []*posting.Posting
+	var postingsErr, budgetErr error
+	var wg sync.WaitGroup
 
 	timeRange := fmt.Sprintf("%d..%d", utils.Now().Year()-3, utils.Now().Year()+3)
-	budgetPostings, err := execHLedgerCommand(journalPath, prices, []string{"--ignore-assertions", "--forecast=" + timeRange, "tag:_generated-transaction"})
+	needsForecast := hasPeriodicTransactions(journalPath)
 
-	if err != nil {
-		return nil, err
+	wg.Add(1)
+	if needsForecast {
+		wg.Add(1)
+	}
+	go func() {
+		defer wg.Done()
+		postings, postingsErr = execHLedgerCommand(journalPath, prices, []string{})
+	}()
+	if needsForecast {
+		go func() {
+			defer wg.Done()
+			budgetPostings, budgetErr = execHLedgerCommand(journalPath, prices, []string{"--ignore-assertions", "--forecast=" + timeRange, "tag:_generated-transaction"})
+		}()
+	}
+	wg.Wait()
+
+	if postingsErr != nil {
+		return nil, postingsErr
+	}
+	if budgetErr != nil {
+		return nil, budgetErr
 	}
 
 	return append(postings, budgetPostings...), nil
-
 }
 
 func (HLedgerCLI) Prices(journalPath string) ([]price.Price, error) {
@@ -901,6 +945,57 @@ func buildHLedgerPostings(p HLedgerPosting, t HLedgerTransaction, pricesTree map
 	}
 
 	return postings, nil
+}
+
+var includeDirectiveRegexp = regexp.MustCompile(`(?i)^\s*include\s+(.+?)\s*$`)
+
+// hasPeriodicTransactions reports whether the journal (following `include`
+// directives, recursively, glob patterns and all) contains any periodic
+// transaction directive (a line starting with `~`). Both ledger's --budget
+// and hledger's --forecast can only ever produce output from these, so
+// callers use this to skip that subprocess call entirely when there's
+// nothing it could produce.
+func hasPeriodicTransactions(journalPath string) bool {
+	return scanForPeriodicTransactions(journalPath, make(map[string]bool))
+}
+
+func scanForPeriodicTransactions(path string, visited map[string]bool) bool {
+	absPath, err := filepath.Abs(path)
+	if err != nil || visited[absPath] {
+		return false
+	}
+	visited[absPath] = true
+
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+
+	dir := filepath.Dir(path)
+	for _, line := range strings.Split(string(content), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "~") {
+			return true
+		}
+
+		if m := includeDirectiveRegexp.FindStringSubmatch(strings.TrimRight(line, "\r")); m != nil {
+			pattern := m[1]
+			if !filepath.IsAbs(pattern) {
+				pattern = filepath.Join(dir, pattern)
+			}
+			matches, err := filepath.Glob(pattern)
+			if err != nil {
+				continue
+			}
+			for _, included := range matches {
+				if scanForPeriodicTransactions(included, visited) {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
 }
 
 func buildPricesTree(prices []price.Price) map[string]*btree.BTree {

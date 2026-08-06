@@ -47,22 +47,37 @@ func loadPriceCache(db *gorm.DB) {
 		log.Fatal(result.Error)
 	}
 
-	for commodityName, postings := range lo.GroupBy(postings, func(p posting.Posting) string { return p.Commodity }) {
+	postingsByCommodity := lo.GroupBy(postings, func(p posting.Posting) string { return p.Commodity })
+
+	var nonCurrencyCommodities []string
+	for commodityName, postings := range postingsByCommodity {
 		if !utils.IsCurrency(postings[0].Commodity) {
-			result := db.Where("commodity_type = ? and commodity_name = ?", config.Unknown, commodityName).Find(&prices)
-			if result.Error != nil {
-				log.Fatal(result.Error)
-			}
+			nonCurrencyCommodities = append(nonCurrencyCommodities, commodityName)
+		}
+	}
 
-			postingPricesTree := btree.New(2)
-			for _, price := range prices {
-				postingPricesTree.ReplaceOrInsert(price)
-			}
-			pcache.postingPricesTree[commodityName] = postingPricesTree
+	// One query for every distinct non-currency commodity instead of one
+	// query per commodity (previously N+1 - on a portfolio with 100+
+	// distinct holdings, that's 100+ round-trips every time this cache is
+	// rebuilt after a sync).
+	var unknownPrices []price.Price
+	if len(nonCurrencyCommodities) > 0 {
+		result = db.Where("commodity_type = ? and commodity_name in ?", config.Unknown, nonCurrencyCommodities).Find(&unknownPrices)
+		if result.Error != nil {
+			log.Fatal(result.Error)
+		}
+	}
+	unknownPricesByCommodity := lo.GroupBy(unknownPrices, func(p price.Price) string { return p.CommodityName })
 
-			if pcache.pricesTree[commodityName] == nil {
-				pcache.pricesTree[commodityName] = postingPricesTree
-			}
+	for _, commodityName := range nonCurrencyCommodities {
+		postingPricesTree := btree.New(2)
+		for _, price := range unknownPricesByCommodity[commodityName] {
+			postingPricesTree.ReplaceOrInsert(price)
+		}
+		pcache.postingPricesTree[commodityName] = postingPricesTree
+
+		if pcache.pricesTree[commodityName] == nil {
+			pcache.pricesTree[commodityName] = postingPricesTree
 		}
 	}
 }

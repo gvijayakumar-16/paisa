@@ -120,14 +120,15 @@ func UpsertAll(db *gorm.DB, postings []*Posting) {
 		if err != nil {
 			return err
 		}
-		for _, posting := range postings {
-			err := tx.Create(posting).Error
-			if err != nil {
-				return err
-			}
+		if len(postings) == 0 {
+			return nil
 		}
-
-		return nil
+		// Bulk insert instead of one tx.Create() per row - on a ledger with
+		// thousands of postings, row-by-row inserts were the dominant cost
+		// of every journal save. Batch size kept conservative (17 columns
+		// x 50 rows < 999 SQL variables) to stay safe on any sqlite build,
+		// old or new.
+		return tx.CreateInBatches(postings, 50).Error
 	})
 
 	if err != nil {

@@ -1,12 +1,83 @@
 package ledger
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/ananthakumaran/paisa/internal/model/price"
 	"github.com/ananthakumaran/paisa/internal/utils"
 	"github.com/stretchr/testify/assert"
 )
+
+func writeFile(t *testing.T, dir string, name string, content string) string {
+	path := filepath.Join(dir, name)
+	assert.NoError(t, os.WriteFile(path, []byte(content), 0644))
+	return path
+}
+
+func TestHasPeriodicTransactions_NoPeriodicDirectives(t *testing.T) {
+	dir := t.TempDir()
+	root := writeFile(t, dir, "main.ledger", "2023-01-01 * Salary\n    Assets:Checking  1000 INR\n    Income:Salary\n")
+	assert.False(t, hasPeriodicTransactions(root))
+}
+
+func TestHasPeriodicTransactions_DirectlyInRoot(t *testing.T) {
+	dir := t.TempDir()
+	root := writeFile(t, dir, "main.ledger", "~ Monthly\n    Expenses:Rent  1000 INR\n    Assets:Checking\n")
+	assert.True(t, hasPeriodicTransactions(root))
+}
+
+func TestHasPeriodicTransactions_IndentedPeriodicDirective(t *testing.T) {
+	dir := t.TempDir()
+	root := writeFile(t, dir, "main.ledger", "  ~ Monthly\n    Expenses:Rent  1000 INR\n")
+	assert.True(t, hasPeriodicTransactions(root))
+}
+
+func TestHasPeriodicTransactions_ViaSingleInclude(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "budget.ledger", "~ Monthly\n    Expenses:Rent  1000 INR\n")
+	root := writeFile(t, dir, "main.ledger", "include budget.ledger\n2023-01-01 * Salary\n    Assets:Checking  1000 INR\n    Income:Salary\n")
+	assert.True(t, hasPeriodicTransactions(root))
+}
+
+func TestHasPeriodicTransactions_ViaGlobInclude(t *testing.T) {
+	dir := t.TempDir()
+	assert.NoError(t, os.Mkdir(filepath.Join(dir, "accounts"), 0755))
+	writeFile(t, dir, "accounts/a.ledger", "2023-01-01 * Salary\n    Assets:Checking  1000 INR\n    Income:Salary\n")
+	writeFile(t, dir, "accounts/b.ledger", "~ Monthly\n    Expenses:Rent  1000 INR\n")
+	root := writeFile(t, dir, "main.ledger", "include accounts/*.ledger\n")
+	assert.True(t, hasPeriodicTransactions(root))
+}
+
+func TestHasPeriodicTransactions_GlobIncludeWithoutPeriodic(t *testing.T) {
+	dir := t.TempDir()
+	assert.NoError(t, os.Mkdir(filepath.Join(dir, "accounts"), 0755))
+	writeFile(t, dir, "accounts/a.ledger", "2023-01-01 * Salary\n    Assets:Checking  1000 INR\n    Income:Salary\n")
+	writeFile(t, dir, "accounts/b.ledger", "2023-01-02 * Rent\n    Expenses:Rent  1000 INR\n    Assets:Checking\n")
+	root := writeFile(t, dir, "main.ledger", "include accounts/*.ledger\n")
+	assert.False(t, hasPeriodicTransactions(root))
+}
+
+func TestHasPeriodicTransactions_NestedInclude(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "leaf.ledger", "~ Monthly\n    Expenses:Rent  1000 INR\n")
+	writeFile(t, dir, "mid.ledger", "include leaf.ledger\n")
+	root := writeFile(t, dir, "main.ledger", "include mid.ledger\n")
+	assert.True(t, hasPeriodicTransactions(root))
+}
+
+func TestHasPeriodicTransactions_MissingFile(t *testing.T) {
+	assert.False(t, hasPeriodicTransactions("/nonexistent/path/main.ledger"))
+}
+
+func TestHasPeriodicTransactions_CircularInclude(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "a.ledger", "include b.ledger\n")
+	root := writeFile(t, dir, "b.ledger", "include a.ledger\n")
+	// must terminate rather than infinite-loop, and correctly report false
+	assert.False(t, hasPeriodicTransactions(root))
+}
 
 func assertPriceEqual(t *testing.T, actual price.Price, date string, commodityName string, value float64) {
 	assert.Equal(t, commodityName, actual.CommodityName, "they should be equal")
