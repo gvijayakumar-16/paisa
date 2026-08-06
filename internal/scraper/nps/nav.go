@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -12,12 +11,13 @@ import (
 
 	"github.com/ananthakumaran/paisa/internal/config"
 	"github.com/ananthakumaran/paisa/internal/model/price"
+	"github.com/ananthakumaran/paisa/internal/utils"
 )
 
 func GetNav(schemeCode string, commodityName string) ([]*price.Price, error) {
 	log.Info("Fetching NPS Fund nav from Purified Bytes")
 	url := fmt.Sprintf("https://nps.finbodhi.com/api/schemes/%s/nav.json", schemeCode)
-	resp, err := http.Get(url)
+	resp, err := utils.HTTPClient.Get(url)
 	if err != nil {
 		return nil, err
 	}

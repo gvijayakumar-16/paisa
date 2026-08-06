@@ -2,17 +2,17 @@ package india
 
 import (
 	"io"
-	"net/http"
 
 	"encoding/json"
 
 	"github.com/ananthakumaran/paisa/internal/model/cii"
+	"github.com/ananthakumaran/paisa/internal/utils"
 	log "github.com/sirupsen/logrus"
 )
 
 func GetCostInflationIndex() ([]*cii.CII, error) {
 	log.Info("Fetching Cost Inflation Index from Purified Bytes")
-	resp, err := http.Get("https://india.finbodhi.com/api/cii/v2.json")
+	resp, err := utils.HTTPClient.Get("https://india.finbodhi.com/api/cii/v2.json")
 	if err != nil {
 		return nil, err
 	}

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"strconv"
 	"time"
 
@@ -13,12 +12,13 @@ import (
 
 	"github.com/ananthakumaran/paisa/internal/config"
 	"github.com/ananthakumaran/paisa/internal/model/price"
+	"github.com/ananthakumaran/paisa/internal/utils"
 )
 
 func GetNav(schemeCode string, commodityName string) ([]*price.Price, error) {
 	log.Info("Fetching Mutual Fund nav from mfapi.in")
 	url := fmt.Sprintf("https://api.mfapi.in/mf/%s", schemeCode)
-	resp, err := http.Get(url)
+	resp, err := utils.HTTPClient.Get(url)
 	if err != nil {
 		return nil, err
 	}

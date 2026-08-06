@@ -3,6 +3,7 @@ package model
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/ananthakumaran/paisa/internal/config"
 	"github.com/ananthakumaran/paisa/internal/ledger"
@@ -67,29 +68,51 @@ func SyncJournal(db *gorm.DB) (string, error) {
 	return "", nil
 }
 
+// fetchConcurrency bounds how many price providers are hit at once.
+// ponytail: fixed cap, revisit if a provider starts rate-limiting us.
+const fetchConcurrency = 8
+
+type commodityFetchResult struct {
+	commodity config.Commodity
+	prices    []*price.Price
+	err       error
+}
+
 func SyncCommodities(db *gorm.DB) error {
 	AutoMigrate(db)
 	log.Info("Fetching commodities price history")
 	commodities := lo.Shuffle(commodity.All())
 
+	// Fetching is pure network IO with no shared state, so it's done
+	// concurrently. Writes go through sequentially afterwards on the
+	// caller's goroutine since sqlite only supports one writer at a time.
+	results := make([]commodityFetchResult, len(commodities))
+	sem := make(chan struct{}, fetchConcurrency)
+	var wg sync.WaitGroup
+	for i, c := range commodities {
+		wg.Add(1)
+		go func(i int, c config.Commodity) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			log.Info("Fetching commodity ", c.Name)
+			provider := scraper.GetProviderByCode(c.Price.Provider)
+			prices, err := provider.GetPrices(c.Price.Code, c.Name)
+			results[i] = commodityFetchResult{commodity: c, prices: prices, err: err}
+		}(i, c)
+	}
+	wg.Wait()
+
 	var errors []error
-	for _, commodity := range commodities {
-		name := commodity.Name
-		log.Info("Fetching commodity ", name)
-		code := commodity.Price.Code
-		var prices []*price.Price
-		var err error
-
-		provider := scraper.GetProviderByCode(commodity.Price.Provider)
-		prices, err = provider.GetPrices(code, name)
-
-		if err != nil {
-			log.Error(err)
-			errors = append(errors, fmt.Errorf("Failed to fetch price for %s: %w", name, err))
+	for _, result := range results {
+		if result.err != nil {
+			log.Error(result.err)
+			errors = append(errors, fmt.Errorf("Failed to fetch price for %s: %w", result.commodity.Name, result.err))
 			continue
 		}
 
-		price.UpsertAllByTypeNameAndID(db, commodity.Type, name, code, prices)
+		price.UpsertAllByTypeNameAndID(db, result.commodity.Type, result.commodity.Name, result.commodity.Price.Code, result.prices)
 	}
 
 	if len(errors) > 0 {

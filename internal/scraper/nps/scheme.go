@@ -2,17 +2,17 @@ package nps
 
 import (
 	"io"
-	"net/http"
 
 	"encoding/json"
 
 	"github.com/ananthakumaran/paisa/internal/model/nps/scheme"
+	"github.com/ananthakumaran/paisa/internal/utils"
 	log "github.com/sirupsen/logrus"
 )
 
 func GetSchemes() ([]*scheme.Scheme, error) {
 	log.Info("Fetching NPS scheme list from Purified Bytes")
-	resp, err := http.Get("https://nps.finbodhi.com/api/schemes.json")
+	resp, err := utils.HTTPClient.Get("https://nps.finbodhi.com/api/schemes.json")
 	if err != nil {
 		return nil, err
 	}

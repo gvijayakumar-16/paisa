@@ -12,6 +12,7 @@ import (
 
 	"github.com/ananthakumaran/paisa/internal/config"
 	"github.com/ananthakumaran/paisa/internal/model/portfolio"
+	"github.com/ananthakumaran/paisa/internal/utils"
 )
 
 func GetPortfolio(schemeCode string, commodityName string) ([]*portfolio.Portfolio, error) {
@@ -36,7 +37,7 @@ WHERE s.code = %s
 	req, err := http.NewRequest("POST", url, strings.NewReader(query))
 	req.Header.Add("Content-Type", "text/plain")
 	req.Header.Add("Authorization", "Basic cGxheTo=")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := utils.HTTPClient.Do(req)
 
 	if err != nil {
 		return nil, err

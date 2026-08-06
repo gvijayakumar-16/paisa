@@ -136,7 +136,7 @@ func getTicker(ticker string) (*Response, error) {
 	agent.Do(func() { selectAgent() })
 	req.Header.Add("User-Agent", agent.name)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := utils.HTTPClient.Do(req)
 	if err != nil {
 		return nil, err
 	}

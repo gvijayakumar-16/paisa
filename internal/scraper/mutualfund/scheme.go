@@ -2,15 +2,15 @@ package mutualfund
 
 import (
 	"encoding/csv"
-	"net/http"
 
 	"github.com/ananthakumaran/paisa/internal/model/mutualfund/scheme"
+	"github.com/ananthakumaran/paisa/internal/utils"
 	log "github.com/sirupsen/logrus"
 )
 
 func GetSchemes() ([]*scheme.Scheme, error) {
 	log.Info("Fetching Mutual Fund Scheme list from AMFI Website")
-	resp, err := http.Get("https://portal.amfiindia.com/DownloadSchemeData_Po.aspx?mf=0")
+	resp, err := utils.HTTPClient.Get("https://portal.amfiindia.com/DownloadSchemeData_Po.aspx?mf=0")
 	if err != nil {
 		return nil, err
 	}

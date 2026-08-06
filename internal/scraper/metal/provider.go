@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"gorm.io/gorm"
 	"io"
-	"net/http"
 	"time"
 
 	"github.com/ananthakumaran/paisa/internal/config"
 	"github.com/ananthakumaran/paisa/internal/model/price"
+	"github.com/ananthakumaran/paisa/internal/utils"
 	"github.com/shopspring/decimal"
 	log "github.com/sirupsen/logrus"
 )
@@ -52,7 +52,7 @@ func (p *PriceProvider) ClearCache(db *gorm.DB) {
 func (p *PriceProvider) GetPrices(code string, commodityName string) ([]*price.Price, error) {
 	log.Info("Fetching Metal price history from Purified Bytes")
 	url := fmt.Sprintf("https://india.finbodhi.com/api/metal/%s/price.json", code)
-	resp, err := http.Get(url)
+	resp, err := utils.HTTPClient.Get(url)
 	if err != nil {
 		return nil, err
 	}

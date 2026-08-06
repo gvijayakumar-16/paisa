@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"strings"
 	"time"
 
@@ -56,7 +55,7 @@ func (p AlphaVantageExchangePrice) Less(o btree.Item) bool {
 }
 
 func fetch[R any](url string, response *R) error {
-	resp, err := http.Get(url)
+	resp, err := utils.HTTPClient.Get(url)
 	if err != nil {
 		return err
 	}

@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -21,6 +22,10 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
+
+// HTTPClient is shared by all scrapers so price fetches don't hang forever
+// on a stalled connection (bare http.Get has no timeout).
+var HTTPClient = &http.Client{Timeout: 15 * time.Second}
 
 func BTreeDescendFirstLessOrEqual[I btree.Item](tree *btree.BTree, item I) I {
 	var hit I
