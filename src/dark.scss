@@ -28,6 +28,16 @@ html[data-theme="dark"] {
 
   $card-header-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.7);
 
+  // Lighter accent than the light theme's $violet-600 for contrast against
+  // a dark background; box/card shadow darkened to match. Hex is used
+  // directly (not $violet-400) since colors.scss isn't imported until
+  // app.scss pulls it in below.
+  $link: #a78bfa;
+  $box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.45),
+    0 2px 6px rgba(0, 0, 0, 0.55);
+  $card-shadow: $box-shadow;
+
   &:root {
     color-scheme: dark;
     --fa-border-color: hsl(0, 0%, 15%);

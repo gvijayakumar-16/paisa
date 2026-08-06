@@ -29,53 +29,72 @@
   let showLogout = isLoggedIn();
 </script>
 
-<div class="dropdown ml-2 is-hoverable {isMobile() ? 'is-left' : 'is-right'}">
-  <div class="dropdown-trigger dropdown-icon">
-    <button class="button is-large" aria-haspopup="true">
-      <span class="icon">
-        <i class="fas fa-ellipsis-vertical" />
-      </span>
-    </button>
+<!-- ponytail: DaisyUI pilot migration (paisa/pilot-css-migration). Bulma's
+     is-hoverable had no DaisyUI equivalent, so this opens on click/focus
+     instead of hover - a deliberate behavior change, not an oversight. -->
+<div class="du-dropdown ml-2 {isMobile() ? '' : 'du-dropdown-end'}">
+  <div
+    tabindex="0"
+    role="button"
+    class="du-btn du-btn-ghost du-btn-circle du-btn-sm"
+    aria-haspopup="true"
+  >
+    <span class="icon">
+      <i class="fas fa-ellipsis-vertical" />
+    </span>
   </div>
-  <div class="dropdown-menu" id="dropdown-menu4" role="menu">
-    <div class="dropdown-content">
-      <a on:click={(_e) => syncWithLoader({ journal: true })} class="dropdown-item icon-text">
+  <ul
+    tabindex="0"
+    class="du-dropdown-content du-menu bg-base-100 du-rounded-box z-10 w-64 p-2 shadow"
+    id="dropdown-menu4"
+    role="menu"
+  >
+    <li>
+      <a on:click={(_e) => syncWithLoader({ journal: true })} class="flex items-center gap-2">
         <span class="icon is-small">
           <i class="fa-regular fa-file-lines" />
         </span>
         <span>Sync Journal</span>
       </a>
-      <a on:click={(_e) => syncWithLoader({ prices: true })} class="dropdown-item icon-text">
+    </li>
+    <li>
+      <a on:click={(_e) => syncWithLoader({ prices: true })} class="flex items-center gap-2">
         <span class="icon is-small">
           <i class="fas fa-dollar-sign" />
         </span>
-        <span>Update Prices</span></a
-      >
-      <a on:click={(_e) => syncWithLoader({ portfolios: true })} class="dropdown-item icon-text">
+        <span>Update Prices</span>
+      </a>
+    </li>
+    <li>
+      <a on:click={(_e) => syncWithLoader({ portfolios: true })} class="flex items-center gap-2">
         <span class="icon is-small">
           <i class="fas fa-layer-group" />
         </span>
-        <span>Update Mutual Fund Portfolios</span></a
-      >
-      <hr class="dropdown-divider" />
-      <a class="dropdown-item icon-text">
-        <label for={obscureId} class="cursor-pointer w-full inline-block">
+        <span>Update Mutual Fund Portfolios</span>
+      </a>
+    </li>
+    <div class="du-divider my-1" />
+    <li>
+      <a class="flex items-center gap-2">
+        <label for={obscureId} class="cursor-pointer w-full inline-flex items-center gap-2">
           <input bind:checked={$obscure} id={obscureId} type="checkbox" class="is-hidden" />
-          <span class="ml-0 icon is-small">
+          <span class="icon is-small">
             <i class="fas {$obscure ? 'fa-eye-slash' : 'fa-eye'}" />
           </span>
           <span>{$obscure ? "Show" : "Hide"} numbers</span>
         </label>
       </a>
-      {#if showLogout}
-        <hr class="dropdown-divider" />
-        <a on:click={(_e) => doLogout()} class="dropdown-item icon-text">
+    </li>
+    {#if showLogout}
+      <div class="du-divider my-1" />
+      <li>
+        <a on:click={(_e) => doLogout()} class="flex items-center gap-2">
           <span class="icon is-small">
             <i class="fas fa-arrow-right-from-bracket" />
           </span>
           <span>Logout</span>
         </a>
-      {/if}
-    </div>
-  </div>
+      </li>
+    {/if}
+  </ul>
 </div>
