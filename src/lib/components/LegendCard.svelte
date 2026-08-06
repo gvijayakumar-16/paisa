@@ -1,5 +1,5 @@
 <script lang="ts">
-  import * as d3 from "d3";
+  import { select } from "d3-selection";
   import type { Action } from "svelte/action";
   import type { Legend } from "$lib/utils";
 
@@ -8,7 +8,7 @@
 
   const textureScale = 14;
   const texture: Action<SVGSVGElement, { texture: any }> = (element, props) => {
-    const svg = d3.select(element);
+    const svg = select(element);
     svg.call(props.texture);
     svg
       .append("rect")

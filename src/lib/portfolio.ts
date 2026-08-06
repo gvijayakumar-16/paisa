@@ -1,4 +1,15 @@
-import * as d3 from "d3";
+import { axisTop } from "d3-axis";
+// Aliased: local variables in this file are also named `stratify`/`treemap`
+// (a layout result and a D3 selection respectively), which would otherwise
+// shadow these d3-hierarchy imports at their call sites.
+import { stratify as d3Stratify, treemap as d3Treemap, type HierarchyNode } from "d3-hierarchy";
+import { scaleBand, scaleLinear, scaleOrdinal, type ScaleOrdinal } from "d3-scale";
+import { schemeCategory10, schemePastel2 } from "d3-scale-chromatic";
+import { select } from "d3-selection";
+// Side-effect import: this augments Selection.prototype with .transition(),
+// used below. d3-selection alone doesn't provide it (the "d3" meta-package
+// pulled this in for free).
+import "d3-transition";
 import _ from "lodash";
 import {
   formatCurrency,
@@ -54,7 +65,7 @@ export function renderPortfolioBreakdown(
 } {
   const { small } = options;
   const BAR_HEIGHT = rem(25);
-  const svg = d3.select(id),
+  const svg = select(id),
     margin = { top: rem(20), right: 0, bottom: rem(10), left: rem(20) },
     fullWidth =
       Math.max(
@@ -66,7 +77,7 @@ export function renderPortfolioBreakdown(
 
   svg.attr("width", fullWidth);
 
-  const y = d3.scaleBand().paddingInner(0.1).paddingOuter(0);
+  const y = scaleBand().paddingInner(0.1).paddingOuter(0);
 
   const targetWidth = small ? width - rem(190) : rem(500);
   const targetMargin = rem(20);
@@ -74,8 +85,8 @@ export function renderPortfolioBreakdown(
   const textGroupMargin = rem(20);
   const textGroupZero = targetWidth + targetMargin;
 
-  const x = d3.scaleLinear().range([textGroupZero + textGroupWidth + textGroupMargin, width]);
-  const x1 = d3.scaleLinear().range([0, targetWidth]);
+  const x = scaleLinear().range([textGroupZero + textGroupWidth + textGroupMargin, width]);
+  const x1 = scaleLinear().range([0, targetWidth]);
 
   const groups = _.chain(portfolioAggregates)
     .map((p) => p.sub_group)
@@ -108,7 +119,7 @@ export function renderPortfolioBreakdown(
 
   const textGroupg = g.append("g");
 
-  const treemap = d3.select(id + "-treemap");
+  const treemap = select(id + "-treemap");
   const treemapg = treemap.append("div");
 
   let rendered = false;
@@ -116,9 +127,9 @@ export function renderPortfolioBreakdown(
   let z: any;
   if (!_.isEmpty(groups)) {
     const range =
-      options.z || (getColorPreference() == "dark" ? d3.schemeCategory10 : d3.schemePastel2);
+      options.z || (getColorPreference() == "dark" ? schemeCategory10 : schemePastel2);
 
-    z = d3.scaleOrdinal<string>().domain(groups).range(range);
+    z = scaleOrdinal<string>().domain(groups).range(range);
   }
 
   return {
@@ -131,7 +142,7 @@ export function renderPortfolioBreakdown(
     }),
     renderer: (
       portfolioAggregates: PortfolioAggregate[],
-      color: d3.ScaleOrdinal<string, string>
+      color: ScaleOrdinal<string, string>
     ) => {
       if (_.isEmpty(portfolioAggregates)) {
         treemap.style("display", "none");
@@ -200,8 +211,7 @@ export function renderPortfolioBreakdown(
         .attr("class", "axis y")
         .attr("transform", "translate(0," + height + ")")
         .call(
-          d3
-            .axisTop(x1)
+          axisTop(x1)
             .tickSize(height)
             .tickFormat(skipTicks(40, x1, (n: number) => formatFloat(n, 1)))
         );
@@ -278,7 +288,7 @@ export function renderPortfolioBreakdown(
           .style("position", "relative")
           .style("height", y.bandwidth() + "px")
           .each(function (pa) {
-            renderPartition(this, pa, d3.treemap(), color, partitionWidth);
+            renderPartition(this, pa, d3Treemap(), color, partitionWidth);
           });
       }
     }
@@ -289,7 +299,7 @@ function renderPartition(
   element: HTMLElement,
   pa: PortfolioAggregate,
   hierarchy: any,
-  color: d3.ScaleOrdinal<string, string>,
+  color: ScaleOrdinal<string, string>,
   clientWidth: number
 ) {
   if (_.isEmpty(pa.breakdowns)) {
@@ -312,17 +322,16 @@ function renderPartition(
     .fromPairs()
     .value();
 
-  const div = d3.select(element),
+  const div = select(element),
     margin = { top: 0, right: 0, bottom: 0, left: 20 },
     width = clientWidth - margin.left - margin.right,
     height = +div.style("height").replace("px", "") - margin.top - margin.bottom;
 
-  const percent = (d: d3.HierarchyNode<CommodityBreakdown>) => {
+  const percent = (d: HierarchyNode<CommodityBreakdown>) => {
     return formatFloat((d.value / root.value) * 100) + "%";
   };
 
-  const stratify = d3
-    .stratify<CommodityBreakdown>()
+  const stratify = d3Stratify<CommodityBreakdown>()
     .id((d) => d.commodity_name)
     .parentId((d) => (d.commodity_name == "root" ? null : "root"));
 

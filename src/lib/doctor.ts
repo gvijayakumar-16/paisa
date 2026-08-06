@@ -1,9 +1,9 @@
-import * as d3 from "d3";
+import { select } from "d3-selection";
 import type { Issue } from "./utils";
 
 export function renderIssues(issues: Issue[]) {
   const id = "#d3-diagnosis";
-  const root = d3.select(id);
+  const root = select(id);
 
   const issue = root
     .selectAll("div")

@@ -1,10 +1,9 @@
-import * as d3 from "d3";
+import { pie } from "d3-shape";
 import _ from "lodash";
 import { secondName, type Posting } from "./utils";
 
 export function pieData(expenses: Posting[]) {
-  return d3
-    .pie<{ category: string; total: number }>()
+  return pie<{ category: string; total: number }>()
     .value((g) => g.total)
     .sort((a, b) => a.category.localeCompare(b.category))(_.values(byExpenseGroup(expenses)));
 }

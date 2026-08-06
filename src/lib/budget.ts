@@ -1,4 +1,5 @@
-import * as d3 from "d3";
+import { scaleLinear } from "d3-scale";
+import { select } from "d3-selection";
 import { darkLightColor, type AccountBudget } from "./utils";
 import _ from "lodash";
 import COLORS from "./colors";
@@ -6,7 +7,7 @@ import chroma from "chroma-js";
 import textures from "textures";
 
 export function renderBudget(element: Element, accountBudget: AccountBudget) {
-  const svg = d3.select(element).select("svg"),
+  const svg = select(element).select("svg"),
     margin = { top: 2, right: 10, bottom: 4, left: 10 },
     width = element.clientWidth - margin.left - margin.right,
     height = +svg.attr("height") - margin.top - margin.bottom;
@@ -17,7 +18,7 @@ export function renderBudget(element: Element, accountBudget: AccountBudget) {
     accountBudget.actual,
     accountBudget.actual - accountBudget.rollover
   ]);
-  const x = d3.scaleLinear().domain([0, max]).range([0, width]);
+  const x = scaleLinear().domain([0, max]).range([0, width]);
   const g = svg.append("g").attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
   const gainColor = darkLightColor(COLORS.success, COLORS.gain);

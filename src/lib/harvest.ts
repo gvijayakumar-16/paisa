@@ -1,4 +1,5 @@
-import * as d3 from "d3";
+import { scaleLinear } from "d3-scale";
+import { select } from "d3-selection";
 import dayjs from "dayjs";
 import _, { round } from "lodash";
 import COLORS from "./colors";
@@ -6,7 +7,7 @@ import { formatCurrency, formatFloat, restName, tooltip, type Harvestable } from
 
 export function renderHarvestables(harvestables: Harvestable[]) {
   const id = "#d3-harvestables";
-  const root = d3.select(id);
+  const root = select(id);
 
   const card = root
     .selectAll("div.column")
@@ -31,7 +32,7 @@ export function renderHarvestables(harvestables: Harvestable[]) {
     .style("cursor", "auto")
     .append("div")
     .each(function (h) {
-      const self = d3.select(this);
+      const self = select(this);
       const [units, amount, taxableGain] = unitsRequiredFromGain(h, 100000);
       self.append("span").html("If you redeem&nbsp;");
       const unitsSpan = self.append("span").text(formatFloat(units));
@@ -226,7 +227,7 @@ function unitsRequiredFromAmount(
 }
 
 function renderSingleBar(harvestable: Harvestable) {
-  const selection = d3.select(this);
+  const selection = select(this);
   const svg = selection.append("svg");
 
   const height = 20;
@@ -238,7 +239,7 @@ function renderSingleBar(harvestable: Harvestable) {
     .attr("width", width + margin.left + margin.right)
     .attr("height", height + margin.top + margin.bottom);
 
-  const x = d3.scaleLinear().range([0, width]).domain([0, harvestable.total_units]);
+  const x = scaleLinear().range([0, width]).domain([0, harvestable.total_units]);
 
   const non_harvestable_units = harvestable.total_units - harvestable.harvestable_units;
 

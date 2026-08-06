@@ -1,4 +1,10 @@
-import * as d3 from "d3";
+import { extent } from "d3-array";
+import { axisBottom, axisLeft, axisRight } from "d3-axis";
+import { scaleLinear, scaleOrdinal, scaleTime } from "d3-scale";
+import { select } from "d3-selection";
+// area aliased: local `const area` below self-references the d3-shape
+// area generator inside its own initializer.
+import { area as d3Area, curveMonotoneX, line } from "d3-shape";
 import { Delaunay } from "d3";
 import _ from "lodash";
 import tippy from "tippy.js";
@@ -29,7 +35,7 @@ export function renderNetworth(
   const start = _.min(_.map(points, (p) => p.date)),
     end = now();
 
-  const svg = d3.select(element);
+  const svg = select(element);
 
   svg.selectAll("*").remove();
 
@@ -43,11 +49,10 @@ export function renderNetworth(
 
   const areaKeys = ["gain", "loss"];
   const colors = [COLORS.gain, COLORS.loss];
-  const areaScale = d3.scaleOrdinal<string>().domain(areaKeys).range(colors);
+  const areaScale = scaleOrdinal<string>().domain(areaKeys).range(colors);
 
   const lineKeys = ["networth", "investment"];
-  const lineScale = d3
-    .scaleOrdinal<string>()
+  const lineScale = scaleOrdinal<string>()
     .domain(lineKeys)
     .range([COLORS.primary, COLORS.secondary]);
 
@@ -57,14 +62,13 @@ export function renderNetworth(
   ]);
   positions.push(0);
 
-  const x = d3.scaleTime().range([0, width]).domain([start, end]),
-    y = d3.scaleLinear().range([height, 0]).domain(d3.extent(positions)),
-    z = d3.scaleOrdinal<string>(colors).domain(areaKeys);
+  const x = scaleTime().range([0, width]).domain([start, end]),
+    y = scaleLinear().range([height, 0]).domain(extent(positions)),
+    z = scaleOrdinal<string>(colors).domain(areaKeys);
 
   const area = (y0: number, y1: (d: Networth) => number) =>
-    d3
-      .area<Networth>()
-      .curve(d3.curveMonotoneX)
+    d3Area<Networth>()
+      .curve(curveMonotoneX)
       .x((d) => x(d.date))
       .y0(y0)
       .y1(y1);
@@ -72,18 +76,18 @@ export function renderNetworth(
   g.append("g")
     .attr("class", "axis x")
     .attr("transform", "translate(0," + height + ")")
-    .call(d3.axisBottom(x));
+    .call(axisBottom(x));
 
   if (!isMobile()) {
     g.append("g")
       .attr("class", "axis y")
       .attr("transform", `translate(${width},0)`)
-      .call(d3.axisRight(y).tickPadding(5).tickFormat(formatCurrencyCrude));
+      .call(axisRight(y).tickPadding(5).tickFormat(formatCurrencyCrude));
   }
 
   g.append("g")
     .attr("class", "axis y")
-    .call(d3.axisLeft(y).tickSize(-width).tickFormat(formatCurrencyCrude));
+    .call(axisLeft(y).tickSize(-width).tickFormat(formatCurrencyCrude));
 
   const layer = g.selectAll(".layer").data([points]).enter().append("g").attr("class", "layer");
 
@@ -142,9 +146,8 @@ export function renderNetworth(
     .style("fill", "none")
     .attr(
       "d",
-      d3
-        .line<Networth>()
-        .curve(d3.curveMonotoneX)
+      line<Networth>()
+        .curve(curveMonotoneX)
         .x((d) => x(d.date))
         .y((d) => y(investment(d)))
     );
@@ -156,9 +159,8 @@ export function renderNetworth(
     .style("fill", "none")
     .attr(
       "d",
-      d3
-        .line<Networth>()
-        .curve(d3.curveMonotoneX)
+      line<Networth>()
+        .curve(curveMonotoneX)
         .x((d) => x(d.date))
         .y((d) => y(networth(d)))
     );

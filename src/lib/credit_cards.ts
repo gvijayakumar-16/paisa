@@ -1,4 +1,7 @@
-import * as d3 from "d3";
+import { max } from "d3-array";
+import { axisBottom, axisLeft } from "d3-axis";
+import { scaleBand, scaleLinear } from "d3-scale";
+import { select } from "d3-selection";
 import { formatCurrencyCrude, tooltip, formatCurrency } from "./utils";
 import _ from "lodash";
 import COLORS from "./colors";
@@ -8,7 +11,7 @@ export function renderYearlySpends(
   yearlySpends: { [year: string]: { [month: string]: number } }
 ) {
   const BAR_HEIGHT = 20;
-  const svg = d3.select(svgNode),
+  const svg = select(svgNode),
     margin = { top: 15, right: 20, bottom: 20, left: 70 },
     width = svgNode.parentElement.clientWidth - margin.left - margin.right,
     g = svg.append("g").attr("transform", "translate(" + margin.left + "," + margin.top + ")");
@@ -32,18 +35,18 @@ export function renderYearlySpends(
     .sortBy((p) => p.year)
     .value();
 
-  const x = d3.scaleLinear().range([0, width]);
-  const y = d3.scaleBand().range([height, 0]).paddingInner(0.2).paddingOuter(0);
+  const x = scaleLinear().range([0, width]);
+  const y = scaleBand().range([height, 0]).paddingInner(0.2).paddingOuter(0);
 
   y.domain(points.map((p) => p.year));
-  x.domain([0, d3.max(points, (p: Point) => p.value)]);
+  x.domain([0, max(points, (p: Point) => p.value)]);
 
   g.append("g")
     .attr("class", "axis y")
     .attr("transform", "translate(0," + height + ")")
-    .call(d3.axisBottom(x).tickSize(-height).tickFormat(formatCurrencyCrude));
+    .call(axisBottom(x).tickSize(-height).tickFormat(formatCurrencyCrude));
 
-  g.append("g").attr("class", "axis y dark").call(d3.axisLeft(y));
+  g.append("g").attr("class", "axis y dark").call(axisLeft(y));
 
   g.append("g")
     .selectAll("rect")

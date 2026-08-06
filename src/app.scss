@@ -49,7 +49,12 @@ $borderColor: none;
 $textSize: 1rem;
 $headerBackgroundColor: $white;
 $headerTextColor: $grey-dark;
-$headerBorderColor: rgba($grey-lightest, 1);
+// Header border was full-opacity grey against 0.5-opacity row/separator
+// borders elsewhere in the same table - harsher hairline than the rest.
+// Footer border/separator were hardcoded literal greys, so they didn't
+// follow dark.scss's grey overrides at all (stayed light-grey in dark
+// mode). Both now derive from the same grey scale as everything else.
+$headerBorderColor: rgba($grey-lightest, 0.5);
 $headerSeparatorColor: rgba($grey-light, 0.5);
 $headerMargin: 0.2857rem;
 $sortArrowActive: $black;
@@ -63,10 +68,10 @@ $rowSelectedBackground: #9abcea;
 $rowSelectedBackgroundHover: #769bcc;
 $editBoxColor: #1d68cd;
 $errorColor: #dd0000;
-$footerBackgroundColor: #fff;
-$footerTextColor: #555;
-$footerBorderColor: #aaa;
-$footerSeparatorColor: #999;
+$footerBackgroundColor: $white;
+$footerTextColor: $grey-dark;
+$footerBorderColor: rgba($grey-light, 0.5);
+$footerSeparatorColor: rgba($grey-lightest, 0.5);
 $footerActiveColor: #d00;
 
 @import "tabulator-tables/src/scss/themes/tabulator_simple.scss";
@@ -172,6 +177,13 @@ $footerActiveColor: #d00;
 
 :focus {
   outline: 0;
+}
+
+// :focus alone drops the ring for everyone, including keyboard users.
+// :focus-visible restores it only for keyboard/non-pointer focus.
+:focus-visible {
+  outline: 2px solid $link;
+  outline-offset: 2px;
 }
 
 html,

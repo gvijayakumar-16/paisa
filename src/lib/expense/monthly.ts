@@ -1,4 +1,21 @@
-import * as d3 from "d3";
+import { extent, max } from "d3-array";
+import { axisBottom, axisLeft } from "d3-axis";
+import { scaleBand, scaleLinear, type ScaleOrdinal } from "d3-scale";
+import { select } from "d3-selection";
+// Side-effect import: this augments Selection.prototype with .transition(),
+// used below. d3-selection alone doesn't provide it (the "d3" meta-package
+// pulled this in for free).
+import "d3-transition";
+// arc aliased: the callback parameter below is also named `arc` (the
+// per-slice pie datum), which shadows the d3-shape arc generator.
+import {
+  arc as d3Arc,
+  curveStepAfter,
+  line,
+  stack,
+  stackOffsetDiverging,
+  type SeriesPoint
+} from "d3-shape";
 import type { Dayjs } from "dayjs";
 import chroma from "chroma-js";
 import _ from "lodash";
@@ -24,12 +41,12 @@ import { byExpenseGroup, expenseGroup, pieData } from "$lib/expense";
 export function renderCalendar(
   month: string,
   expenses: Posting[],
-  z: d3.ScaleOrdinal<string, string, never>,
+  z: ScaleOrdinal<string, string, never>,
   groups: string[]
 ) {
   const id = "#d3-current-month-expense-calendar";
 
-  const alpha = d3.scaleLinear().range([0.3, 1]);
+  const alpha = scaleLinear().range([0.3, 1]);
   const expensesByDay: Record<string, Posting[]> = {};
   const { days, monthStart, monthEnd } = monthDays(month);
   _.each(days, (d) => {
@@ -41,9 +58,9 @@ export function renderCalendar(
 
   const expensesByDayTotal = _.mapValues(expensesByDay, (ps) => _.sumBy(ps, (p) => p.amount));
 
-  alpha.domain(d3.extent(_.values(expensesByDayTotal)));
+  alpha.domain(extent(_.values(expensesByDayTotal)));
 
-  const root = d3.select(id);
+  const root = select(id);
   const dayDivs = root.select("div.days").selectAll("div").data(days);
 
   const tooltipContent = (d: Dayjs) => {
@@ -119,7 +136,7 @@ export function renderCalendar(
       return z(d.data.category);
     })
     .attr("d", (arc) => {
-      return d3.arc().innerRadius(13).outerRadius(17)(arc as any);
+      return d3Arc().innerRadius(13).outerRadius(17)(arc as any);
     });
 }
 
@@ -134,14 +151,14 @@ export function renderMonthlyExpensesTimeline(
   monthStore: Writable<string>,
   dateRangeStore: Readable<{ from: Dayjs; to: Dayjs }>
 ): {
-  z: d3.ScaleOrdinal<string, string, never>;
+  z: ScaleOrdinal<string, string, never>;
   destroy: Unsubscriber;
   legends: Legend[];
 } {
   const id = "#d3-monthly-expense-timeline";
   const timeFormat = "MMM-YYYY";
   const MAX_BAR_WIDTH = rem(40);
-  const svg = d3.select(id),
+  const svg = select(id),
     margin = { top: rem(15), right: rem(30), bottom: rem(60), left: rem(40) },
     width =
       document.getElementById(id.substring(1)).parentElement.clientWidth -
@@ -159,7 +176,7 @@ export function renderMonthlyExpensesTimeline(
 
   const z = generateColorScheme(groups);
 
-  const [start, end] = d3.extent(_.map(postings, (p) => p.date));
+  const [start, end] = extent(_.map(postings, (p) => p.date));
 
   if (!start) {
     return {
@@ -227,11 +244,11 @@ export function renderMonthlyExpensesTimeline(
     );
   });
 
-  const x = d3.scaleBand().range([0, width]).paddingInner(0.1).paddingOuter(0);
-  const y = d3.scaleLinear().range([height, 0]);
+  const x = scaleBand().range([0, width]).paddingInner(0.1).paddingOuter(0);
+  const y = scaleLinear().range([height, 0]);
 
   const tooltipContent = (allowedGroups: string[]) => {
-    return (d: d3.SeriesPoint<Record<string, number>>) => {
+    return (d: SeriesPoint<Record<string, number>>) => {
       let grandTotal = 0;
       return tooltip(
         _.flatMap(allowedGroups, (key) => {
@@ -281,7 +298,7 @@ export function renderMonthlyExpensesTimeline(
     );
     const sum = (p: Point) => _.sum(_.map(allowedGroups, (k) => p[k]));
     x.domain(allowedPoints.map((p) => p.month));
-    y.domain([0, d3.max(allowedPoints, sum)]);
+    y.domain([0, max(allowedPoints, sum)]);
 
     const t = svg.transition().duration(firstRender ? 0 : 750);
     firstRender = false;
@@ -289,8 +306,7 @@ export function renderMonthlyExpensesTimeline(
       .attr("transform", "translate(0," + height + ")")
       .transition(t)
       .call(
-        d3
-          .axisBottom(x)
+        axisBottom(x)
           .ticks(5)
           .tickFormat(skipTicks(30, x, (d) => d.toString()))
       )
@@ -301,11 +317,10 @@ export function renderMonthlyExpensesTimeline(
       .attr("transform", "rotate(-45)")
       .style("text-anchor", "end");
 
-    yAxis.transition(t).call(d3.axisLeft(y).tickSize(-width).tickFormat(formatCurrencyCrude));
+    yAxis.transition(t).call(axisLeft(y).tickSize(-width).tickFormat(formatCurrencyCrude));
 
-    const path = d3
-      .line<Point>()
-      .curve(d3.curveStepAfter)
+    const path = line<Point>()
+      .curve(curveStepAfter)
       .x((p) => x(p.month))
       .y((p) => {
         const total = _.chain(ys[p.timestamp.format("YYYY")])
@@ -323,7 +338,7 @@ export function renderMonthlyExpensesTimeline(
     bars
       .selectAll("g")
       .data(
-        d3.stack().offset(d3.stackOffsetDiverging).keys(allowedGroups)(
+        stack().offset(stackOffsetDiverging).keys(allowedGroups)(
           allowedPoints as { [key: string]: number }[]
         ),
         (d: any) => d.key
@@ -414,11 +429,11 @@ export function renderMonthlyExpensesTimeline(
   return { z: z, destroy: destroy, legends };
 }
 
-export function renderCurrentExpensesBreakdown(z: d3.ScaleOrdinal<string, string, never>) {
+export function renderCurrentExpensesBreakdown(z: ScaleOrdinal<string, string, never>) {
   const id = "#d3-current-month-breakdown";
   const BAR_HEIGHT = rem(20);
   const TEXT_WIDTH = rem(135);
-  const svg = d3.select(id),
+  const svg = select(id),
     margin = { top: 0, right: rem(160), bottom: rem(20), left: rem(100) },
     width =
       document.getElementById(id.substring(1)).parentElement.clientWidth -
@@ -426,8 +441,8 @@ export function renderCurrentExpensesBreakdown(z: d3.ScaleOrdinal<string, string
       margin.right,
     g = svg.append("g").attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
-  const x = d3.scaleLinear().range([0, width]);
-  const y = d3.scaleBand().paddingInner(0.1).paddingOuter(0);
+  const x = scaleLinear().range([0, width]);
+  const y = scaleBand().paddingInner(0.1).paddingOuter(0);
 
   const xAxis = g.append("g").attr("class", "axis y");
   const yAxis = g.append("g").attr("class", "axis y dark");
@@ -454,7 +469,7 @@ export function renderCurrentExpensesBreakdown(z: d3.ScaleOrdinal<string, string
     svg.attr("height", height + margin.top + margin.bottom);
 
     y.domain(keys);
-    x.domain([0, d3.max(points, (p) => p.total)]);
+    x.domain([0, max(points, (p) => p.total)]);
     y.range([height, 0]);
 
     const t = svg.transition().duration(750);
@@ -463,15 +478,14 @@ export function renderCurrentExpensesBreakdown(z: d3.ScaleOrdinal<string, string
       .attr("transform", "translate(0," + height + ")")
       .transition(t)
       .call(
-        d3
-          .axisBottom(x)
+        axisBottom(x)
           .tickSize(-height)
           .tickFormat(skipTicks(60, x, formatCurrencyCrude))
       );
 
     yAxis
       .transition(t)
-      .call(d3.axisLeft(y).tickFormat((g) => iconify(g, { group: "Expenses", suffix: true })));
+      .call(axisLeft(y).tickFormat((g) => iconify(g, { group: "Expenses", suffix: true })));
 
     const tooltipContent = (d: Point) => {
       const total = _.sumBy(d.postings, (p) => p.amount);

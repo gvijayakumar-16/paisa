@@ -1,4 +1,7 @@
-import * as d3 from "d3";
+import { axisBottom, axisLeft, axisRight } from "d3-axis";
+import { scaleLinear, scaleOrdinal, scaleTime } from "d3-scale";
+import { select } from "d3-selection";
+import { area, curveMonotoneX, line } from "d3-shape";
 import { Delaunay } from "d3";
 import _, { first, last, takeRight } from "lodash";
 import tippy, { type Placement } from "tippy.js";
@@ -24,7 +27,7 @@ export function renderProgress(
     end = (last(predictions) || last(points)).date;
   const positions = _.map(points.concat(predictions), (p) => p.value);
 
-  const svg = d3.select(element),
+  const svg = select(element),
     margin = { top: rem(40), right: rem(80), bottom: rem(20), left: rem(40) },
     width = Math.max(element.parentElement.clientWidth, 1000) - margin.left - margin.right,
     height = +svg.attr("height") - margin.top - margin.bottom,
@@ -33,39 +36,36 @@ export function renderProgress(
   svg.attr("width", width + margin.left + margin.right);
 
   const lineKeys = ["actual", "forecast"];
-  const lineScale = d3
-    .scaleOrdinal<string>()
+  const lineScale = scaleOrdinal<string>()
     .domain(lineKeys)
     .range([COLORS.gainText, COLORS.secondary]);
 
-  const x = d3.scaleTime().range([0, width]).domain([start, end]),
-    y = d3
-      .scaleLinear()
+  const x = scaleTime().range([0, width]).domain([start, end]),
+    y = scaleLinear()
       .range([height, 0])
       .domain([0, _.max(positions)]);
 
   g.append("g")
     .attr("class", "axis x")
     .attr("transform", "translate(0," + height + ")")
-    .call(d3.axisBottom(x));
+    .call(axisBottom(x));
 
   g.append("g")
     .attr("class", "axis y")
     .attr("transform", `translate(${width},0)`)
-    .call(d3.axisRight(y).tickPadding(5).tickFormat(formatCurrencyCrude));
+    .call(axisRight(y).tickPadding(5).tickFormat(formatCurrencyCrude));
 
   g.append("g")
     .attr("class", "axis y")
-    .call(d3.axisLeft(y).tickSize(-width).tickFormat(formatCurrencyCrude));
+    .call(axisLeft(y).tickSize(-width).tickFormat(formatCurrencyCrude));
 
   g.append("path")
     .style("stroke", lineScale("actual"))
     .style("fill", "none")
     .attr(
       "d",
-      d3
-        .line<Point>()
-        .curve(d3.curveMonotoneX)
+      line<Point>()
+        .curve(curveMonotoneX)
         .x((d) => x(d.date))
         .y((d) => y(d.value))(points)
     );
@@ -75,9 +75,8 @@ export function renderProgress(
     .style("fill", "none")
     .attr(
       "d",
-      d3
-        .line<Point>()
-        .curve(d3.curveMonotoneX)
+      line<Point>()
+        .curve(curveMonotoneX)
         .x((d) => x(d.date))
         .y((d) => y(d.value))(takeRight(points, 1).concat(predictions))
     );
@@ -87,9 +86,8 @@ export function renderProgress(
     .style("opacity", "0.2")
     .attr(
       "d",
-      d3
-        .area<Forecast>()
-        .curve(d3.curveMonotoneX)
+      area<Forecast>()
+        .curve(curveMonotoneX)
         .x((d) => x(d.date))
         .y0((d) => y(d.value - d.error / 2))
         .y1((d) => y(d.value + d.error / 2))(predictions)

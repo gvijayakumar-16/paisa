@@ -1,5 +1,6 @@
 <script lang="ts">
-  import * as d3 from "d3";
+  import { extent } from "d3-array";
+import { type ScaleOrdinal } from "d3-scale";
   import { onMount } from "svelte";
   import _ from "lodash";
   import { ajax, formatCurrency, formatPercentage, type Legend, type Posting } from "$lib/utils";
@@ -17,7 +18,7 @@
   import LegendCard from "$lib/components/LegendCard.svelte";
 
   let groups = writable([]);
-  let z: d3.ScaleOrdinal<string, string, never>,
+  let z: ScaleOrdinal<string, string, never>,
     renderer: (ps: Posting[]) => void,
     expenses: Posting[],
     grouped_expenses: Record<string, Posting[]>,
@@ -81,7 +82,7 @@
       }
     } = await ajax("/api/expense"));
 
-    const [start, end] = d3.extent(_.map(expenses, (e) => e.date));
+    const [start, end] = extent(_.map(expenses, (e) => e.date));
     if (start) {
       dateMin.set(start);
       dateMax.set(end);

@@ -10,7 +10,17 @@ import {
   rem,
   type Legend
 } from "$lib/utils";
-import * as d3 from "d3";
+import { extent } from "d3-array";
+import { axisBottom, axisLeft } from "d3-axis";
+import { scaleBand, scaleLinear, scaleOrdinal } from "d3-scale";
+import { select } from "d3-selection";
+// Side-effect import: this augments Selection.prototype with .transition(),
+// used below. d3-selection alone doesn't provide it (the "d3" meta-package
+// pulled this in for free).
+import "d3-transition";
+// line aliased: a local `const line` (a D3 selection) shadows the d3-shape
+// line generator at its call site further down.
+import { curveMonotoneX, line as d3Line, stack } from "d3-shape";
 import { sankeyCircular, sankeyJustify } from "d3-sankey-circular";
 import { pathArrows } from "d3-path-arrows";
 import _ from "lodash";
@@ -31,7 +41,7 @@ export function renderMonthlyFlow(
   }
 ) {
   const MAX_BAR_WIDTH = rem(20);
-  const svg = d3.select(id),
+  const svg = select(id),
     margin = {
       top: rem(15),
       right: rem(30),
@@ -64,13 +74,13 @@ export function renderMonthlyFlow(
   ];
 
   const lineKeys = ["balance"];
-  const lineScale = d3.scaleOrdinal<string>().domain(lineKeys).range([COLORS.primary]);
+  const lineScale = scaleOrdinal<string>().domain(lineKeys).range([COLORS.primary]);
 
-  const x = d3.scaleBand().range([0, width]).paddingInner(0.1),
-    y = d3.scaleLinear().range([height, 0]),
-    z = d3.scaleOrdinal<string>(colors).domain(areaKeys);
+  const x = scaleBand().range([0, width]).paddingInner(0.1),
+    y = scaleLinear().range([height, 0]),
+    z = scaleOrdinal<string>(colors).domain(areaKeys);
 
-  const x1 = d3.scaleBand().domain(["0", "1"]).paddingInner(0.1).paddingOuter(0.1);
+  const x1 = scaleBand().domain(["0", "1"]).paddingInner(0.1).paddingOuter(0.1);
 
   const xAxis = g
     .append("g")
@@ -103,7 +113,7 @@ export function renderMonthlyFlow(
     positions.push(0);
 
     x.domain(_.map(cashFlows, (c) => c.date.format("MMM YYYY")));
-    y.domain(d3.extent(positions));
+    y.domain(extent(positions));
     x1.range([0, x.bandwidth()]);
 
     const t = svg.transition().duration(firstRender ? 0 : 750);
@@ -112,8 +122,7 @@ export function renderMonthlyFlow(
     const axis = xAxis
       .transition(t)
       .call(
-        d3
-          .axisBottom(x)
+        axisBottom(x)
           .ticks(5)
           .tickFormat(skipTicks(30, x, (d) => d.toString()))
       )
@@ -126,7 +135,7 @@ export function renderMonthlyFlow(
       axis.attr("transform", "rotate(-45)").style("text-anchor", "end");
     }
 
-    yAxis.transition(t).call(d3.axisLeft(y).tickSize(-width).tickFormat(formatCurrencyCrude));
+    yAxis.transition(t).call(axisLeft(y).tickSize(-width).tickFormat(formatCurrencyCrude));
 
     const gbars = groups
       .selectAll("g.group")
@@ -147,7 +156,7 @@ export function renderMonthlyFlow(
     gbars
       .selectAll("g")
       .data((c) => [
-        d3.stack().keys(["income", "liabilities", "investment"])([
+        stack().keys(["income", "liabilities", "investment"])([
           {
             i: "0",
             data: c,
@@ -156,7 +165,7 @@ export function renderMonthlyFlow(
             investment: c.investment < 0 ? -c.investment : 0
           }
         ] as any),
-        d3.stack().keys(["expenses", "tax", "investment", "liabilities"])([
+        stack().keys(["expenses", "tax", "investment", "liabilities"])([
           {
             i: "1",
             data: c,
@@ -216,9 +225,8 @@ export function renderMonthlyFlow(
 
     line.attr(
       "d",
-      d3
-        .line<CashFlow>()
-        .curve(d3.curveMonotoneX)
+      d3Line<CashFlow>()
+        .curve(curveMonotoneX)
         .x((c) => x(c.date.format("MMM YYYY")) + x.bandwidth() / 2)
         .y((c) => y(c.balance))(cashFlows)
     );
@@ -273,7 +281,7 @@ export function renderMonthlyFlow(
 
 export function renderFlow(graph: Graph) {
   const id = "#d3-expense-flow";
-  const svg = d3.select(id);
+  const svg = select(id);
   const margin = { top: rem(60), right: rem(20), bottom: rem(40), left: rem(20) },
     width =
       Math.max(document.getElementById(id.substring(1)).parentElement.clientWidth, 1000) -
@@ -328,7 +336,7 @@ export function renderFlow(graph: Graph) {
   const sankeyNodes = sankeyData.nodes;
   const sankeyLinks = sankeyData.links;
 
-  d3.extent(sankeyNodes, (d: any) => d.depth);
+  extent(sankeyNodes, (d: any) => d.depth);
 
   const node = nodeG.data(sankeyNodes).enter().append("g");
 

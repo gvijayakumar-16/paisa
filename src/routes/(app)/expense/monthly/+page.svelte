@@ -23,9 +23,10 @@
   import BoxLabel from "$lib/components/BoxLabel.svelte";
   import dayjs from "dayjs";
   import LegendCard from "$lib/components/LegendCard.svelte";
+  import type { ScaleOrdinal } from "d3-scale";
 
   let groups = writable([]);
-  let z: d3.ScaleOrdinal<string, string, never>,
+  let z: ScaleOrdinal<string, string, never>,
     renderer: (ps: Posting[]) => void,
     expenses: Posting[],
     grouped_expenses: Record<string, Posting[]>,

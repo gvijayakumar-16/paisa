@@ -1,4 +1,8 @@
-import * as d3 from "d3";
+import { max, min } from "d3-array";
+import { axisBottom, axisLeft } from "d3-axis";
+import { scaleBand, scaleLinear, scaleOrdinal } from "d3-scale";
+import { select } from "d3-selection";
+import { stack, stackOffsetDiverging } from "d3-shape";
 import type dayjs from "dayjs";
 import _ from "lodash";
 import {
@@ -21,7 +25,7 @@ export function renderMonthlyInvestmentTimeline(incomes: Income[]): Legend[] {
 
 function renderIncomeTimeline(incomes: Income[], id: string, timeFormat: string): Legend[] {
   const MAX_BAR_WIDTH = 40;
-  const svg = d3.select(id),
+  const svg = select(id),
     margin = { top: 20, right: 30, bottom: 80, left: 40 },
     width =
       document.getElementById(id.substring(1)).parentElement.clientWidth -
@@ -76,8 +80,8 @@ function renderIncomeTimeline(incomes: Income[], id: string, timeFormat: string)
     );
   });
 
-  const x = d3.scaleBand().range([0, width]).paddingInner(0.1).paddingOuter(0);
-  const y = d3.scaleLinear().range([height, 0]);
+  const x = scaleBand().range([0, width]).paddingInner(0.1).paddingOuter(0);
+  const y = scaleLinear().range([height, 0]);
 
   const sum = (filter: (n: number) => boolean) => (p: Point) =>
     _.sum(
@@ -88,11 +92,11 @@ function renderIncomeTimeline(incomes: Income[], id: string, timeFormat: string)
     );
   x.domain(points.map((p) => p.month));
   y.domain([
-    d3.min(
+    min(
       points,
       sum((a) => a < 0)
     ),
-    d3.max(
+    max(
       points,
       sum((a) => a > 0)
     )
@@ -104,8 +108,7 @@ function renderIncomeTimeline(incomes: Income[], id: string, timeFormat: string)
     .attr("class", "axis x")
     .attr("transform", "translate(0," + height + ")")
     .call(
-      d3
-        .axisBottom(x)
+      axisBottom(x)
         .ticks(5)
         .tickFormat(skipTicks(30, x, (d) => d.toString()))
     )
@@ -118,12 +121,12 @@ function renderIncomeTimeline(incomes: Income[], id: string, timeFormat: string)
 
   g.append("g")
     .attr("class", "axis y")
-    .call(d3.axisLeft(y).tickSize(-width).tickFormat(formatCurrencyCrude));
+    .call(axisLeft(y).tickSize(-width).tickFormat(formatCurrencyCrude));
 
   g.append("g")
     .selectAll("g")
     .data(
-      d3.stack().offset(d3.stackOffsetDiverging).keys(groupKeys)(
+      stack().offset(stackOffsetDiverging).keys(groupKeys)(
         points as { [key: string]: number }[]
       )
     )
@@ -181,7 +184,7 @@ function financialYear(card: IncomeYearlyCard) {
 export function renderYearlyIncomeTimeline(yearlyCards: IncomeYearlyCard[]): Legend[] {
   const id = "#d3-yearly-income-timeline";
   const BAR_HEIGHT = 20;
-  const svg = d3.select(id),
+  const svg = select(id),
     margin = { top: 15, right: 20, bottom: 20, left: 70 },
     width =
       document.getElementById(id.substring(1)).parentElement.clientWidth -
@@ -237,25 +240,25 @@ export function renderYearlyIncomeTimeline(yearlyCards: IncomeYearlyCard[]): Leg
     );
   });
 
-  const x = d3.scaleLinear().range([0, width]);
-  const y = d3.scaleBand().range([height, 0]).paddingInner(0.1).paddingOuter(0);
+  const x = scaleLinear().range([0, width]);
+  const y = scaleBand().range([height, 0]).paddingInner(0.1).paddingOuter(0);
 
   y.domain(points.map((p) => p.year));
-  x.domain([0, d3.max(points, (p: Point) => _.sum(_.map(groups, (k) => p[k])))]);
+  x.domain([0, max(points, (p: Point) => _.sum(_.map(groups, (k) => p[k])))]);
 
   const z = generateColorScheme(groups);
 
   g.append("g")
     .attr("class", "axis y")
     .attr("transform", "translate(0," + height + ")")
-    .call(d3.axisBottom(x).tickSize(-height).tickFormat(formatCurrencyCrude));
+    .call(axisBottom(x).tickSize(-height).tickFormat(formatCurrencyCrude));
 
-  g.append("g").attr("class", "axis y dark").call(d3.axisLeft(y));
+  g.append("g").attr("class", "axis y dark").call(axisLeft(y));
 
   g.append("g")
     .selectAll("g")
     .data(
-      d3.stack().offset(d3.stackOffsetDiverging).keys(groups)(points as { [key: string]: number }[])
+      stack().offset(stackOffsetDiverging).keys(groups)(points as { [key: string]: number }[])
     )
     .enter()
     .append("g")
@@ -311,7 +314,7 @@ export function renderYearlyTimelineOf(
 ): Legend[] {
   const id = `#d3-yearly-${key}-timeline`;
   const BAR_HEIGHT = 20;
-  const svg = d3.select(id),
+  const svg = select(id),
     margin = { top: 15, right: 20, bottom: 20, left: 70 },
     width =
       document.getElementById(id.substring(1)).parentElement.clientWidth -
@@ -320,7 +323,7 @@ export function renderYearlyTimelineOf(
     g = svg.append("g").attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
   const colorKeys = [label];
-  const colorScale = d3.scaleOrdinal<string>().domain(colorKeys).range([color]);
+  const colorScale = scaleOrdinal<string>().domain(colorKeys).range([color]);
 
   const start = _.min(_.map(yearlyCards, (c) => c.start_date)),
     end = _.max(_.map(yearlyCards, (c) => c.end_date));
@@ -344,18 +347,18 @@ export function renderYearlyTimelineOf(
     };
   });
 
-  const x = d3.scaleLinear().range([0, width]);
-  const y = d3.scaleBand().range([height, 0]).paddingInner(0.1).paddingOuter(0);
+  const x = scaleLinear().range([0, width]);
+  const y = scaleBand().range([height, 0]).paddingInner(0.1).paddingOuter(0);
 
   y.domain(points.map((p) => p.year));
-  x.domain([0, d3.max(points, (p: Point) => p.value)]);
+  x.domain([0, max(points, (p: Point) => p.value)]);
 
   g.append("g")
     .attr("class", "axis y")
     .attr("transform", "translate(0," + height + ")")
-    .call(d3.axisBottom(x).tickSize(-height).tickFormat(formatCurrencyCrude));
+    .call(axisBottom(x).tickSize(-height).tickFormat(formatCurrencyCrude));
 
-  g.append("g").attr("class", "axis y dark").call(d3.axisLeft(y));
+  g.append("g").attr("class", "axis y dark").call(axisLeft(y));
 
   g.append("g")
     .selectAll("rect")

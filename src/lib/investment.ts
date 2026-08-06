@@ -1,4 +1,8 @@
-import * as d3 from "d3";
+import { max, min } from "d3-array";
+import { axisBottom, axisLeft } from "d3-axis";
+import { scaleBand, scaleLinear } from "d3-scale";
+import { select } from "d3-selection";
+import { stack, stackOffsetDiverging } from "d3-shape";
 import _ from "lodash";
 import {
   forEachMonth,
@@ -25,7 +29,7 @@ export function renderMonthlyInvestmentTimeline(postings: Posting[]): Legend[] {
   const id = "#d3-investment-timeline";
   const timeFormat = "MMM-YYYY";
   const MAX_BAR_WIDTH = rem(40);
-  const svg = d3.select(id),
+  const svg = select(id),
     margin = { top: rem(15), right: rem(30), bottom: rem(60), left: rem(40) },
     width =
       document.getElementById(id.substring(1)).parentElement.clientWidth -
@@ -99,8 +103,8 @@ export function renderMonthlyInvestmentTimeline(postings: Posting[]): Legend[] {
     );
   });
 
-  const x = d3.scaleBand().range([0, width]).paddingInner(0.1).paddingOuter(0);
-  const y = d3.scaleLinear().range([height, 0]);
+  const x = scaleBand().range([0, width]).paddingInner(0.1).paddingOuter(0);
+  const y = scaleLinear().range([height, 0]);
 
   const sum = (filter: (n: number) => boolean) => (p: Point) =>
     _.sum(
@@ -111,11 +115,11 @@ export function renderMonthlyInvestmentTimeline(postings: Posting[]): Legend[] {
     );
   x.domain(points.map((p) => p.month));
   y.domain([
-    d3.min(
+    min(
       points,
       sum((a) => a < 0)
     ),
-    d3.max(
+    max(
       points,
       sum((a) => a > 0)
     )
@@ -127,8 +131,7 @@ export function renderMonthlyInvestmentTimeline(postings: Posting[]): Legend[] {
     .attr("class", "axis x")
     .attr("transform", "translate(0," + height + ")")
     .call(
-      d3
-        .axisBottom(x)
+      axisBottom(x)
         .ticks(5)
         .tickFormat(skipTicks(30, x, (d) => d.toString()))
     )
@@ -141,12 +144,12 @@ export function renderMonthlyInvestmentTimeline(postings: Posting[]): Legend[] {
 
   g.append("g")
     .attr("class", "axis y")
-    .call(d3.axisLeft(y).tickSize(-width).tickFormat(formatCurrencyCrude));
+    .call(axisLeft(y).tickSize(-width).tickFormat(formatCurrencyCrude));
 
   g.append("g")
     .selectAll("g")
     .data(
-      d3.stack().offset(d3.stackOffsetDiverging).keys(groupKeys)(
+      stack().offset(stackOffsetDiverging).keys(groupKeys)(
         points as { [key: string]: number }[]
       )
     )
@@ -198,7 +201,7 @@ export function renderMonthlyInvestmentTimeline(postings: Posting[]): Legend[] {
 export function renderYearlyInvestmentTimeline(yearlyCards: InvestmentYearlyCard[]): Legend[] {
   const id = "#d3-yearly-investment-timeline";
   const BAR_HEIGHT = rem(20);
-  const svg = d3.select(id),
+  const svg = select(id),
     margin = { top: rem(15), right: rem(20), bottom: rem(20), left: rem(70) },
     width =
       document.getElementById(id.substring(1)).parentElement.clientWidth -
@@ -274,8 +277,8 @@ export function renderYearlyInvestmentTimeline(yearlyCards: InvestmentYearlyCard
     );
   });
 
-  const x = d3.scaleLinear().range([0, width]);
-  const y = d3.scaleBand().range([height, 0]).paddingInner(0.1).paddingOuter(0);
+  const x = scaleLinear().range([0, width]);
+  const y = scaleBand().range([height, 0]).paddingInner(0.1).paddingOuter(0);
 
   const sum = (filter: (n: number) => boolean) => (p: Point) =>
     _.sum(
@@ -286,11 +289,11 @@ export function renderYearlyInvestmentTimeline(yearlyCards: InvestmentYearlyCard
     );
   y.domain(points.map((p) => p.year));
   x.domain([
-    d3.min(
+    min(
       points,
       sum((a) => a < 0)
     ),
-    d3.max(
+    max(
       points,
       sum((a) => a > 0)
     )
@@ -301,14 +304,14 @@ export function renderYearlyInvestmentTimeline(yearlyCards: InvestmentYearlyCard
   g.append("g")
     .attr("class", "axis y")
     .attr("transform", "translate(0," + height + ")")
-    .call(d3.axisBottom(x).tickSize(-height).tickFormat(formatCurrencyCrude));
+    .call(axisBottom(x).tickSize(-height).tickFormat(formatCurrencyCrude));
 
-  g.append("g").attr("class", "axis y dark").call(d3.axisLeft(y));
+  g.append("g").attr("class", "axis y dark").call(axisLeft(y));
 
   g.append("g")
     .selectAll("g")
     .data(
-      d3.stack().offset(d3.stackOffsetDiverging).keys(groupKeys)(
+      stack().offset(stackOffsetDiverging).keys(groupKeys)(
         points as { [key: string]: number }[]
       )
     )
@@ -365,7 +368,7 @@ export function renderYearlyInvestmentTimeline(yearlyCards: InvestmentYearlyCard
 
 export function renderYearlyCards(yearlyCards: InvestmentYearlyCard[]) {
   const id = "#d3-yearly-investment-cards";
-  const root = d3.select(id);
+  const root = select(id);
 
   const card = root
     .selectAll("div.column")

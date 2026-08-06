@@ -1,7 +1,8 @@
 import chroma from "chroma-js";
 import _ from "lodash";
 import { getColorPreference } from "./utils";
-import * as d3 from "d3";
+import { scaleOrdinal, scaleSequential } from "d3-scale";
+import { interpolateSinebow } from "d3-scale-chromatic";
 
 const MaterialUI = {
   red: {
@@ -391,15 +392,14 @@ export function generateColorScheme(domain: string[]) {
         ]
       }[n];
     } else {
-      const z = d3
-        .scaleSequential()
+      const z = scaleSequential()
         .domain([0, n - 1])
-        .interpolator(d3.interpolateSinebow);
+        .interpolator(interpolateSinebow);
       colors = _.map(_.range(0, n), (n) => chroma(z(n)).desaturate(1.5).hex());
     }
   }
 
-  return d3.scaleOrdinal<string>().domain(domain).range(colors);
+  return scaleOrdinal<string>().domain(domain).range(colors);
 }
 
 export function genericBarColor() {

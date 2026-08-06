@@ -1,4 +1,9 @@
-import * as d3 from "d3";
+import { map, max } from "d3-array";
+import { axisBottom, axisLeft, axisRight } from "d3-axis";
+import { partition, stratify as d3Stratify, treemap, type HierarchyNode } from "d3-hierarchy";
+import { scaleBand, scaleLinear, scaleOrdinal, scaleThreshold, scaleTime, type ScaleOrdinal } from "d3-scale";
+import { select } from "d3-selection";
+import { curveLinear, line as d3Line } from "d3-shape";
 import type dayjs from "dayjs";
 import _ from "lodash";
 import {
@@ -21,7 +26,7 @@ import chroma from "chroma-js";
 
 export function renderAllocationTarget(
   allocationTargets: AllocationTarget[],
-  color: d3.ScaleOrdinal<string, string>
+  color: ScaleOrdinal<string, string>
 ) {
   const id = "#d3-allocation-target";
 
@@ -30,7 +35,7 @@ export function renderAllocationTarget(
   }
   allocationTargets = _.sortBy(allocationTargets, (t) => t.name);
   const BAR_HEIGHT = rem(25);
-  const svg = d3.select(id),
+  const svg = select(id),
     margin = { top: rem(20), right: rem(20), bottom: rem(10), left: rem(150) },
     fullWidth = Math.max(document.getElementById(id.substring(1)).parentElement.clientWidth, 1000),
     width = fullWidth - margin.left - margin.right,
@@ -44,20 +49,18 @@ export function renderAllocationTarget(
   const colorKeys = ["target", "current", "diff"];
   const colors = [COLORS.primary, COLORS.secondary, COLORS.diff];
 
-  const y = d3.scaleBand().range([0, height]).paddingInner(0).paddingOuter(0);
+  const y = scaleBand().range([0, height]).paddingInner(0).paddingOuter(0);
   y.domain(allocationTargets.map((t) => t.name));
 
-  const y1 = d3
-    .scaleBand()
+  const y1 = scaleBand()
     .range([0, y.bandwidth()])
     .domain(keys)
     .paddingInner(0)
     .paddingOuter(0.1);
 
-  const z = d3.scaleOrdinal<string>(colors).domain(colorKeys);
+  const z = scaleOrdinal<string>(colors).domain(colorKeys);
 
-  const z1 = d3
-    .scaleThreshold<number, string>()
+  const z1 = scaleThreshold<number, string>()
     .domain([5, 10, 15])
     .range([COLORS.gain, COLORS.warn, COLORS.loss, COLORS.loss]);
 
@@ -71,9 +74,9 @@ export function renderAllocationTarget(
   const textGroupMargin = rem(20);
   const textGroupZero = targetWidth + targetMargin;
 
-  const x = d3.scaleLinear().range([textGroupZero + textGroupWidth + textGroupMargin, width]);
+  const x = scaleLinear().range([textGroupZero + textGroupWidth + textGroupMargin, width]);
   x.domain([0, maxX]);
-  const x1 = d3.scaleLinear().range([0, targetWidth]).domain([0, maxX]);
+  const x1 = scaleLinear().range([0, targetWidth]).domain([0, maxX]);
 
   g.append("line")
     .classed("svg-grey-lightest", true)
@@ -108,13 +111,12 @@ export function renderAllocationTarget(
     .attr("class", "axis y")
     .attr("transform", "translate(0," + height + ")")
     .call(
-      d3
-        .axisBottom(x1)
+      axisBottom(x1)
         .tickSize(-height)
         .tickFormat(skipTicks(40, x, (n: number) => formatFloat(n, 0)))
     );
 
-  g.append("g").attr("class", "axis y dark").call(d3.axisLeft(y));
+  g.append("g").attr("class", "axis y dark").call(axisLeft(y));
 
   const textGroup = g
     .append("g")
@@ -199,7 +201,7 @@ export function renderAllocationTarget(
     .attr("fill", z("target"));
 
   const paddingTop = (y1.range()[1] - y1.bandwidth() * 2) / 2;
-  d3.select("#d3-allocation-target-treemap")
+  select("#d3-allocation-target-treemap")
     .append("div")
     .style("height", height + margin.top + margin.bottom + "px")
     .style("position", "absolute")
@@ -217,7 +219,7 @@ export function renderAllocationTarget(
     .style("position", "relative")
     .style("height", y1.bandwidth() * 2 + "px")
     .each(function (t) {
-      renderPartition(this, t.aggregates, d3.treemap(), color, {
+      renderPartition(this, t.aggregates, treemap(), color, {
         margin: { top: 0, right: 0, bottom: 0, left: 0 }
       });
     });
@@ -225,39 +227,38 @@ export function renderAllocationTarget(
 
 export function renderAllocation(
   aggregates: Record<string, Aggregate>,
-  color: d3.ScaleOrdinal<string, string>
+  color: ScaleOrdinal<string, string>
 ) {
   renderPartition(
     document.getElementById("d3-allocation-category"),
     aggregates,
-    d3.partition(),
+    partition(),
     color
   );
-  renderPartition(document.getElementById("d3-allocation-value"), aggregates, d3.treemap(), color);
+  renderPartition(document.getElementById("d3-allocation-value"), aggregates, treemap(), color);
 }
 
 function renderPartition(
   element: HTMLElement,
   aggregates: Record<string, Aggregate>,
   hierarchy: any,
-  color: d3.ScaleOrdinal<string, string>,
+  color: ScaleOrdinal<string, string>,
   options = { margin: { top: 0, right: 20, bottom: 0, left: 0 } }
 ) {
   if (_.isEmpty(aggregates)) {
     return;
   }
 
-  const div = d3.select(element),
+  const div = select(element),
     margin = options.margin,
     width = element.parentElement.clientWidth - margin.left - margin.right,
     height = +div.style("height").replace("px", "") - margin.top - margin.bottom;
 
-  const percent = (d: d3.HierarchyNode<Aggregate>) => {
+  const percent = (d: HierarchyNode<Aggregate>) => {
     return formatFloat((d.value / root.value) * 100) + "%";
   };
 
-  const stratify = d3
-    .stratify<Aggregate>()
+  const stratify = d3Stratify<Aggregate>()
     .id((d) => d.account)
     .parentId((d) => parentName(d.account));
 
@@ -360,7 +361,7 @@ export function renderAllocationTimeline(
     );
   });
 
-  const svg = d3.select("#d3-allocation-timeline"),
+  const svg = select("#d3-allocation-timeline"),
     margin = { top: 40, right: 60, bottom: 20, left: 35 },
     width =
       document.getElementById("d3-allocation-timeline").parentElement.clientWidth -
@@ -369,17 +370,15 @@ export function renderAllocationTimeline(
     height = +svg.attr("height") - margin.top - margin.bottom,
     g = svg.append("g").attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
-  const x = d3.scaleTime().range([0, width]).domain([start, end]),
-    y = d3
-      .scaleLinear()
+  const x = scaleTime().range([0, width]).domain([start, end]),
+    y = scaleLinear()
       .range([height, 0])
-      .domain([0, d3.max(d3.map(points, (p) => d3.max(_.values(_.omit(p, "date")))))]),
+      .domain([0, max(map(points, (p) => max(_.values(_.omit(p, "date")))))]),
     z = generateColorScheme(assets);
 
   const line = (group: string) =>
-    d3
-      .line<Point>()
-      .curve(d3.curveLinear)
+    d3Line<Point>()
+      .curve(curveLinear)
       .defined((p, i) => (p[group] as number) > 0 || (points[i + 1]?.[group] as number) > 0)
       .x((p) => x(p.date))
       .y((p) => y(p[group]));
@@ -387,20 +386,19 @@ export function renderAllocationTimeline(
   g.append("g")
     .attr("class", "axis x")
     .attr("transform", "translate(0," + height + ")")
-    .call(d3.axisBottom(x));
+    .call(axisBottom(x));
 
   g.append("g")
     .attr("class", "axis y")
     .call(
-      d3
-        .axisLeft(y)
+      axisLeft(y)
         .tickSize(-width)
         .tickFormat((y) => `${y}%`)
     );
   g.append("g")
     .attr("class", "axis y")
     .attr("transform", `translate(${width},0)`)
-    .call(d3.axisRight(y).tickFormat((y) => `${y}%`));
+    .call(axisRight(y).tickFormat((y) => `${y}%`));
 
   const layer = g.selectAll(".layer").data(assets).enter().append("g").attr("class", "layer");
 

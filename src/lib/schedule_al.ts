@@ -1,9 +1,9 @@
-import * as d3 from "d3";
+import { select } from "d3-selection";
 import _ from "lodash";
 import { formatCurrency, type ScheduleALEntry } from "./utils";
 
 export function renderBreakdowns(scheduleALEntries: ScheduleALEntry[]) {
-  const tbody = d3.select(".d3-schedule-al");
+  const tbody = select(".d3-schedule-al");
   const trs = tbody.selectAll("tr").data(
     scheduleALEntries.concat([
       {

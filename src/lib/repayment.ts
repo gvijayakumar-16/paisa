@@ -1,4 +1,8 @@
-import * as d3 from "d3";
+import { max } from "d3-array";
+import { axisBottom, axisLeft } from "d3-axis";
+import { scaleBand, scaleLinear } from "d3-scale";
+import { select } from "d3-selection";
+import { stack, stackOffsetDiverging } from "d3-shape";
 import _ from "lodash";
 import {
   forEachMonth,
@@ -20,7 +24,7 @@ export function renderMonthlyRepaymentTimeline(postings: Posting[]): Legend[] {
   const id = "#d3-repayment-timeline";
   const timeFormat = "MMM-YYYY";
   const MAX_BAR_WIDTH = rem(40);
-  const svg = d3.select(id),
+  const svg = select(id),
     margin = { top: rem(20), right: rem(30), bottom: rem(60), left: rem(40) },
     width =
       document.getElementById(id.substring(1)).parentElement.clientWidth -
@@ -70,11 +74,11 @@ export function renderMonthlyRepaymentTimeline(postings: Posting[]): Legend[] {
     );
   });
 
-  const x = d3.scaleBand().range([0, width]).paddingInner(0.1).paddingOuter(0);
-  const y = d3.scaleLinear().range([height, 0]);
+  const x = scaleBand().range([0, width]).paddingInner(0.1).paddingOuter(0);
+  const y = scaleLinear().range([height, 0]);
 
   x.domain(points.map((p) => p.month));
-  y.domain([0, d3.max(points, (p: Point) => _.sum(_.map(groups, (k) => p[k])))]);
+  y.domain([0, max(points, (p: Point) => _.sum(_.map(groups, (k) => p[k])))]);
 
   const z = generateColorScheme(groups);
 
@@ -82,8 +86,7 @@ export function renderMonthlyRepaymentTimeline(postings: Posting[]): Legend[] {
     .attr("class", "axis x")
     .attr("transform", "translate(0," + height + ")")
     .call(
-      d3
-        .axisBottom(x)
+      axisBottom(x)
         .ticks(5)
         .tickFormat(skipTicks(30, x, (d) => d.toString()))
     )
@@ -96,12 +99,12 @@ export function renderMonthlyRepaymentTimeline(postings: Posting[]): Legend[] {
 
   g.append("g")
     .attr("class", "axis y")
-    .call(d3.axisLeft(y).tickSize(-width).tickFormat(formatCurrencyCrude));
+    .call(axisLeft(y).tickSize(-width).tickFormat(formatCurrencyCrude));
 
   g.append("g")
     .selectAll("g")
     .data(
-      d3.stack().offset(d3.stackOffsetDiverging).keys(groups)(points as { [key: string]: number }[])
+      stack().offset(stackOffsetDiverging).keys(groups)(points as { [key: string]: number }[])
     )
     .enter()
     .append("g")

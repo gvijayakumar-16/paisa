@@ -1,4 +1,7 @@
-import * as d3 from "d3";
+import { extent } from "d3-array";
+import { axisBottom } from "d3-axis";
+import { scaleTime } from "d3-scale";
+import { select } from "d3-selection";
 import dayjs from "dayjs";
 import _ from "lodash";
 import { skipTicks, type TransactionSequence } from "./utils";
@@ -9,7 +12,7 @@ export function renderRecurring(
   transactionSequence: TransactionSequence,
   showPage: (pageIndex: number) => void
 ) {
-  const svg = d3.select(element).select("svg"),
+  const svg = select(element).select("svg"),
     margin = { top: 20, right: 40, bottom: 20, left: 30 },
     width = element.parentElement.clientWidth - margin.left - margin.right,
     height = +svg.attr("height") - margin.top - margin.bottom,
@@ -19,15 +22,14 @@ export function renderRecurring(
   schedules = schedules.concat(_.take(transactionSequence.futureSchedules, 1));
 
   const dates = _.map(schedules, (s) => s.scheduled);
-  const [start, end] = d3.extent(dates);
-  const x = d3.scaleTime().domain([start, end]).range([0, width]);
+  const [start, end] = extent(dates);
+  const x = scaleTime().domain([start, end]).range([0, width]);
 
   g.append("g")
     .attr("class", "axis light-domain x")
     .attr("transform", "translate(0," + height + ")")
     .call(
-      d3
-        .axisBottom(x)
+      axisBottom(x)
         .tickValues(dates)
         .tickFormat(skipTicks(50, x, (d: any) => dayjs(d).format("DD MMM YY"), dates.length))
     );

@@ -1,6 +1,12 @@
 import { goto } from "$app/navigation";
 import chroma from "chroma-js";
-import * as d3 from "d3";
+import { extent } from "d3-array";
+import { axisBottom, axisLeft, axisRight } from "d3-axis";
+import { scaleBand, scaleLinear, scaleOrdinal, scaleTime } from "d3-scale";
+import { select } from "d3-selection";
+// area aliased: local `const area` below self-references the d3-shape
+// area generator inside its own initializer.
+import { area as d3Area, curveMonotoneX, line, stack } from "d3-shape";
 import { Delaunay } from "d3";
 import _ from "lodash";
 import tippy from "tippy.js";
@@ -23,10 +29,9 @@ import {
 
 const areaKeys = ["gain", "loss"];
 const colors = [COLORS.gain, COLORS.loss];
-const areaScale = d3.scaleOrdinal<string>().domain(areaKeys).range(colors);
+const areaScale = scaleOrdinal<string>().domain(areaKeys).range(colors);
 const lineKeys = ["balance", "investment", "withdrawal"];
-const typeScale = d3
-  .scaleOrdinal<string>()
+const typeScale = scaleOrdinal<string>()
   .domain(lineKeys)
   .range([COLORS.primary, COLORS.secondary, COLORS.tertiary]);
 
@@ -34,7 +39,7 @@ export function renderOverview(gains: Gain[]) {
   gains = _.sortBy(gains, (g) => g.account);
   const BAR_HEIGHT = rem(15);
   const id = "#d3-gain-overview";
-  const svg = d3.select(id),
+  const svg = select(id),
     margin = { top: rem(25), right: rem(20), bottom: rem(10), left: rem(150) },
     width =
       Math.max(document.getElementById(id.substring(1)).parentElement.clientWidth, 1000) -
@@ -46,17 +51,15 @@ export function renderOverview(gains: Gain[]) {
 
   svg.attr("width", width + margin.left + margin.right);
 
-  const y = d3.scaleBand().range([0, height]).paddingInner(0).paddingOuter(0);
+  const y = scaleBand().range([0, height]).paddingInner(0).paddingOuter(0);
   y.domain(gains.map((g) => restName(g.account)));
-  const y1 = d3
-    .scaleBand()
+  const y1 = scaleBand()
     .range([0, y.bandwidth()])
     .domain(["0", "1"])
     .paddingInner(0)
     .paddingOuter(0.1);
 
-  const y2 = d3
-    .scaleBand()
+  const y2 = scaleBand()
     .range([0, y.bandwidth()])
     .domain(["0", "1"])
     .paddingInner(0.15)
@@ -64,7 +67,7 @@ export function renderOverview(gains: Gain[]) {
 
   const keys = ["balance", "investment", "withdrawal", "gain", "loss"];
   const colors = [COLORS.primary, COLORS.secondary, COLORS.tertiary, COLORS.gain, COLORS.loss];
-  const z = d3.scaleOrdinal<string>(colors).domain(keys);
+  const z = scaleOrdinal<string>(colors).domain(keys);
 
   const getInvestmentAmount = (g: Gain) => g.networth.investmentAmount;
 
@@ -83,10 +86,9 @@ export function renderOverview(gains: Gain[]) {
   const textGroupWidth = rem(225);
   const textGroupZero = xirrWidth + xirrTextWidth + xirrMargin;
 
-  const x = d3.scaleLinear().range([textGroupZero + textGroupWidth, width]);
+  const x = scaleLinear().range([textGroupZero + textGroupWidth, width]);
   x.domain([0, maxX]);
-  const x1 = d3
-    .scaleLinear()
+  const x1 = scaleLinear()
     .range([0, xirrWidth])
     .domain([
       _.min([_.min(_.map(gains, (g) => g.xirr)), 0]),
@@ -119,8 +121,7 @@ export function renderOverview(gains: Gain[]) {
     .attr("class", "axis y")
     .attr("transform", "translate(0," + height + ")")
     .call(
-      d3
-        .axisBottom(x)
+      axisBottom(x)
         .tickSize(-height)
         .tickFormat(skipTicks(60, x, formatCurrencyCrude))
     );
@@ -129,13 +130,12 @@ export function renderOverview(gains: Gain[]) {
     .attr("class", "axis y")
     .attr("transform", "translate(0," + height + ")")
     .call(
-      d3
-        .axisBottom(x1)
+      axisBottom(x1)
         .tickSize(-height)
         .tickFormat(skipTicks(40, x1, (n: number) => formatFloat(n, 1)))
     );
 
-  g.append("g").attr("class", "axis y dark link").call(d3.axisLeft(y));
+  g.append("g").attr("class", "axis y dark link").call(axisLeft(y));
 
   g.selectAll(".axis.y.dark.link .tick").on("click", (_event, label) => {
     goto(`/assets/gain/Assets:${label}`);
@@ -232,7 +232,7 @@ export function renderOverview(gains: Gain[]) {
   groups
     .selectAll("g")
     .data((g) => [
-      d3.stack().keys(["investment", "gain"])([
+      stack().keys(["investment", "gain"])([
         {
           i: "0",
           data: g,
@@ -240,7 +240,7 @@ export function renderOverview(gains: Gain[]) {
           gain: _.max([getGainAmount(g), 0])
         }
       ] as any),
-      d3.stack().keys(["balance", "loss", "withdrawal"])([
+      stack().keys(["balance", "loss", "withdrawal"])([
         {
           i: "1",
           data: g,
@@ -319,7 +319,7 @@ export function renderAccountOverview(points: Networth[], postings: Posting[], i
 
   const element = document.getElementById(id);
 
-  const svg = d3.select(element),
+  const svg = select(element),
     margin = { top: 5, right: 50, bottom: 20, left: 40 },
     width = element.parentElement.clientWidth - margin.left - margin.right,
     height = +svg.attr("height") - margin.top - margin.bottom,
@@ -329,22 +329,20 @@ export function renderAccountOverview(points: Networth[], postings: Posting[], i
   const colors = [COLORS.gain, COLORS.loss];
 
   const lineKeys = ["balance", "investment"];
-  const lineScale = d3
-    .scaleOrdinal<string>()
+  const lineScale = scaleOrdinal<string>()
     .domain(lineKeys)
     .range([COLORS.primary, COLORS.secondary]);
 
   const positions = _.flatMap(points, (p) => [p.balanceAmount, p.netInvestmentAmount]);
   positions.push(0);
 
-  const x = d3.scaleTime().range([0, width]).domain([start, end]),
-    y = d3.scaleLinear().range([height, 0]).domain(d3.extent(positions)),
-    z = d3.scaleOrdinal<string>(colors).domain(areaKeys);
+  const x = scaleTime().range([0, width]).domain([start, end]),
+    y = scaleLinear().range([height, 0]).domain(extent(positions)),
+    z = scaleOrdinal<string>(colors).domain(areaKeys);
 
   const area = (y0: number, y1: (d: Networth) => number) =>
-    d3
-      .area<Networth>()
-      .curve(d3.curveMonotoneX)
+    d3Area<Networth>()
+      .curve(curveMonotoneX)
       .x((d) => x(d.date))
       .y0(y0)
       .y1(y1);
@@ -352,16 +350,16 @@ export function renderAccountOverview(points: Networth[], postings: Posting[], i
   g.append("g")
     .attr("class", "axis x")
     .attr("transform", "translate(0," + height + ")")
-    .call(d3.axisBottom(x));
+    .call(axisBottom(x));
 
   g.append("g")
     .attr("class", "axis y")
     .attr("transform", `translate(${width},0)`)
-    .call(d3.axisRight(y).ticks(5).tickPadding(5).tickFormat(formatCurrencyCrude));
+    .call(axisRight(y).ticks(5).tickPadding(5).tickFormat(formatCurrencyCrude));
 
   g.append("g")
     .attr("class", "axis y")
-    .call(d3.axisLeft(y).ticks(5).tickSize(-width).tickFormat(formatCurrencyCrude));
+    .call(axisLeft(y).ticks(5).tickSize(-width).tickFormat(formatCurrencyCrude));
 
   const postingsG = g.append("g").attr("class", "postings");
 
@@ -441,9 +439,8 @@ export function renderAccountOverview(points: Networth[], postings: Posting[], i
     .style("fill", "none")
     .attr(
       "d",
-      d3
-        .line<Networth>()
-        .curve(d3.curveMonotoneX)
+      line<Networth>()
+        .curve(curveMonotoneX)
         .x((d) => x(d.date))
         .y((d) => y(d.netInvestmentAmount))
     );
@@ -455,9 +452,8 @@ export function renderAccountOverview(points: Networth[], postings: Posting[], i
     .style("fill", "none")
     .attr(
       "d",
-      d3
-        .line<Networth>()
-        .curve(d3.curveMonotoneX)
+      line<Networth>()
+        .curve(curveMonotoneX)
         .x((d) => x(d.date))
         .y((d) => y(d.balanceAmount))
     );

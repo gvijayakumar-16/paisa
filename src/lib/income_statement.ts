@@ -1,4 +1,14 @@
-import * as d3 from "d3";
+import { extent } from "d3-array";
+import { axisLeft, axisTop } from "d3-axis";
+import { scaleBand, scaleLinear } from "d3-scale";
+import { select } from "d3-selection";
+// Side-effect import: this augments Selection.prototype with .transition(),
+// used below. d3-selection alone doesn't provide it (the "d3" meta-package
+// pulled this in for free).
+import "d3-transition";
+// path belongs to d3-path (not d3-shape) and is aliased: local `const path`
+// below self-references it inside its own initializer.
+import { path as d3Path } from "d3-path";
 import {
   formatCurrency,
   formatCurrencyCrude,
@@ -16,7 +26,7 @@ export function renderIncomeStatement(element: Element) {
   const BARS = 4;
   const BAR_HEIGHT = 100;
 
-  const svg = d3.select(element),
+  const svg = select(element),
     margin = { top: rem(20), right: rem(20), bottom: rem(10), left: rem(110) },
     width = Math.max(element.parentElement.clientWidth, 600) - margin.left - margin.right,
     g = svg.append("g").attr("transform", "translate(" + margin.left + "," + margin.top + ")");
@@ -27,8 +37,8 @@ export function renderIncomeStatement(element: Element) {
     .attr("width", width + margin.left + margin.right);
 
   const sum = (object: Record<string, number>) => Object.values(object).reduce((a, b) => a + b, 0);
-  const y = d3.scaleBand().range([height, 0]).paddingInner(0.4).paddingOuter(0.6);
-  const x = d3.scaleLinear().range([0, width]);
+  const y = scaleBand().range([height, 0]).paddingInner(0.4).paddingOuter(0.6);
+  const x = scaleLinear().range([0, width]);
 
   const xAxis = g
     .append("g")
@@ -59,7 +69,7 @@ export function renderIncomeStatement(element: Element) {
     .gapLength(100)
     .arrowHeadSize(3)
     .path((d: Bar) => {
-      const path = d3.path();
+      const path = d3Path();
 
       const startY = y(d.label) + y.bandwidth() + 4;
       const startX = x(d.start);
@@ -183,7 +193,7 @@ export function renderIncomeStatement(element: Element) {
 
     y.domain(bars.map((d) => d.label).reverse());
     x.domain(
-      d3.extent([
+      extent([
         incomeStart,
         interestStart,
         taxStart,
@@ -195,8 +205,8 @@ export function renderIncomeStatement(element: Element) {
       ])
     );
 
-    xAxis.transition(t).call(d3.axisTop(x).tickSize(height).tickFormat(formatCurrencyCrude));
-    yAxis.transition(t).call(d3.axisLeft(y).tickSize(-width).tickPadding(10));
+    xAxis.transition(t).call(axisTop(x).tickSize(height).tickFormat(formatCurrencyCrude));
+    yAxis.transition(t).call(axisLeft(y).tickSize(-width).tickPadding(10));
 
     garrows.selectAll("g").remove();
     t.on("end", () => {

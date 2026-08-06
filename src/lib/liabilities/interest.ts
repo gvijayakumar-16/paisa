@@ -1,5 +1,11 @@
 import chroma from "chroma-js";
-import * as d3 from "d3";
+import { max } from "d3-array";
+import { axisBottom, axisLeft, axisRight } from "d3-axis";
+import { scaleBand, scaleLinear, scaleOrdinal, scaleTime } from "d3-scale";
+import { select } from "d3-selection";
+// area aliased: local `const area` below self-references the d3-shape
+// area generator inside its own initializer.
+import { area as d3Area, curveMonotoneX, line, stack } from "d3-shape";
 import type dayjs from "dayjs";
 import _ from "lodash";
 import COLORS from "$lib/colors";
@@ -18,15 +24,14 @@ import {
 
 const areaKeys = ["gain", "loss"];
 const colors = [COLORS.gain, COLORS.loss];
-const areaScale = d3.scaleOrdinal<string>().domain(areaKeys).range(colors);
+const areaScale = scaleOrdinal<string>().domain(areaKeys).range(colors);
 const lineKeys = ["balance", "drawn", "repaid"];
-const lineScale = d3
-  .scaleOrdinal<string>()
+const lineScale = scaleOrdinal<string>()
   .domain(lineKeys)
   .range([COLORS.primary, COLORS.secondary, COLORS.tertiary]);
 
 function renderTable(interest: Interest) {
-  const tbody = d3.select(this);
+  const tbody = select(this);
   const current = _.last(interest.overview_timeline);
   tbody.html(function () {
     return `
@@ -64,7 +69,7 @@ export function renderOverview(gains: Interest[]) {
   gains = _.sortBy(gains, (g) => g.account);
   const BAR_HEIGHT = rem(15);
   const id = "#d3-interest-overview";
-  const svg = d3.select(id),
+  const svg = select(id),
     margin = { top: rem(5), right: rem(20), bottom: rem(30), left: rem(150) },
     width =
       Math.max(document.getElementById(id.substring(1)).parentElement.clientWidth, 850) -
@@ -76,17 +81,15 @@ export function renderOverview(gains: Interest[]) {
 
   svg.attr("width", width + margin.left + margin.right);
 
-  const y = d3.scaleBand().range([0, height]).paddingInner(0).paddingOuter(0);
+  const y = scaleBand().range([0, height]).paddingInner(0).paddingOuter(0);
   y.domain(gains.map((g) => restName(g.account)));
-  const y1 = d3
-    .scaleBand()
+  const y1 = scaleBand()
     .range([0, y.bandwidth()])
     .domain(["0", "1"])
     .paddingInner(0)
     .paddingOuter(0.1);
 
-  const y2 = d3
-    .scaleBand()
+  const y2 = scaleBand()
     .range([0, y.bandwidth()])
     .domain(["0", "1"])
     .paddingInner(0.15)
@@ -94,7 +97,7 @@ export function renderOverview(gains: Interest[]) {
 
   const keys = ["balance", "drawn", "repaid", "gain", "loss"];
   const colors = [COLORS.primary, COLORS.secondary, COLORS.tertiary, COLORS.gain, COLORS.loss];
-  const z = d3.scaleOrdinal<string>(colors).domain(keys);
+  const z = scaleOrdinal<string>(colors).domain(keys);
 
   const getDrawnAmount = (g: Interest) => _.last(g.overview_timeline).drawn_amount;
 
@@ -116,10 +119,9 @@ export function renderOverview(gains: Interest[]) {
   const textGroupWidth = rem(225);
   const textGroupZero = aprWidth + aprTextWidth + aprMargin;
 
-  const x = d3.scaleLinear().range([textGroupZero + textGroupWidth, width]);
+  const x = scaleLinear().range([textGroupZero + textGroupWidth, width]);
   x.domain([0, maxX]);
-  const x1 = d3
-    .scaleLinear()
+  const x1 = scaleLinear()
     .range([0, aprWidth])
     .domain([
       _.min([_.min(_.map(gains, (g) => g.apr)), 0]),
@@ -151,8 +153,7 @@ export function renderOverview(gains: Interest[]) {
     .attr("class", "axis y")
     .attr("transform", "translate(0," + height + ")")
     .call(
-      d3
-        .axisBottom(x)
+      axisBottom(x)
         .tickSize(-height)
         .tickFormat(skipTicks(60, x, formatCurrencyCrude))
     );
@@ -161,13 +162,12 @@ export function renderOverview(gains: Interest[]) {
     .attr("class", "axis y")
     .attr("transform", "translate(0," + height + ")")
     .call(
-      d3
-        .axisBottom(x1)
+      axisBottom(x1)
         .tickSize(-height)
         .tickFormat(skipTicks(40, x1, (n: number) => formatFloat(n, 1)))
     );
 
-  g.append("g").attr("class", "axis y dark").call(d3.axisLeft(y));
+  g.append("g").attr("class", "axis y dark").call(axisLeft(y));
 
   const textGroup = g
     .append("g")
@@ -260,7 +260,7 @@ export function renderOverview(gains: Interest[]) {
   groups
     .selectAll("g")
     .data((g) => [
-      d3.stack().keys(["drawn", "loss"])([
+      stack().keys(["drawn", "loss"])([
         {
           i: "0",
           data: g,
@@ -268,7 +268,7 @@ export function renderOverview(gains: Interest[]) {
           loss: _.max([getInterestAmount(g), 0])
         }
       ] as any),
-      d3.stack().keys(["balance", "gain", "repaid"])([
+      stack().keys(["balance", "gain", "repaid"])([
         {
           i: "1",
           data: g,
@@ -355,8 +355,7 @@ export function renderPerAccountOverview(interests: Interest[]) {
   const start = _.min(dates),
     end = _.max(dates);
 
-  const divs = d3
-    .select("#d3-interest-timeline-breakdown")
+  const divs = select("#d3-interest-timeline-breakdown")
     .selectAll("div")
     .data(_.sortBy(interests, (g) => g.account));
 
@@ -391,7 +390,7 @@ function renderOverviewSmall(
   element: Element,
   xDomain: [dayjs.Dayjs, dayjs.Dayjs]
 ) {
-  const svg = d3.select(element),
+  const svg = select(element),
     margin = { top: 5, right: 80, bottom: 20, left: 40 },
     width = Math.max(element.parentElement.clientWidth, 800) - margin.left - margin.right,
     height = +svg.attr("height") - margin.top - margin.bottom,
@@ -399,20 +398,18 @@ function renderOverviewSmall(
 
   svg.attr("width", width + margin.left + margin.right);
 
-  const x = d3.scaleTime().range([0, width]).domain(xDomain),
-    y = d3
-      .scaleLinear()
+  const x = scaleTime().range([0, width]).domain(xDomain),
+    y = scaleLinear()
       .range([height, 0])
       .domain([
         0,
-        d3.max<InterestOverview, number>(points, (d) => d.interest_amount + d.drawn_amount)
+        max<InterestOverview, number>(points, (d) => d.interest_amount + d.drawn_amount)
       ]),
-    z = d3.scaleOrdinal<string>(colors).domain(areaKeys);
+    z = scaleOrdinal<string>(colors).domain(areaKeys);
 
   const area = (y0: number, y1: (d: InterestOverview) => number) =>
-    d3
-      .area<InterestOverview>()
-      .curve(d3.curveMonotoneX)
+    d3Area<InterestOverview>()
+      .curve(curveMonotoneX)
       .x((d) => x(d.date))
       .y0(y0)
       .y1(y1);
@@ -420,16 +417,16 @@ function renderOverviewSmall(
   g.append("g")
     .attr("class", "axis x")
     .attr("transform", "translate(0," + height + ")")
-    .call(d3.axisBottom(x));
+    .call(axisBottom(x));
 
   g.append("g")
     .attr("class", "axis y")
     .attr("transform", `translate(${width},0)`)
-    .call(d3.axisRight(y).ticks(5).tickPadding(5).tickFormat(formatCurrencyCrude));
+    .call(axisRight(y).ticks(5).tickPadding(5).tickFormat(formatCurrencyCrude));
 
   g.append("g")
     .attr("class", "axis y")
-    .call(d3.axisLeft(y).ticks(5).tickSize(-width).tickFormat(formatCurrencyCrude));
+    .call(axisLeft(y).ticks(5).tickSize(-width).tickFormat(formatCurrencyCrude));
 
   const layer = g.selectAll(".layer").data([points]).enter().append("g").attr("class", "layer");
 
@@ -487,9 +484,8 @@ function renderOverviewSmall(
     .style("fill", "none")
     .attr(
       "d",
-      d3
-        .line<InterestOverview>()
-        .curve(d3.curveMonotoneX)
+      line<InterestOverview>()
+        .curve(curveMonotoneX)
         .x((d) => x(d.date))
         .y((d) => y(d.drawn_amount))
     );
@@ -500,9 +496,8 @@ function renderOverviewSmall(
     .style("fill", "none")
     .attr(
       "d",
-      d3
-        .line<InterestOverview>()
-        .curve(d3.curveMonotoneX)
+      line<InterestOverview>()
+        .curve(curveMonotoneX)
         .defined((d) => d.repaid_amount > 0)
         .x((d) => x(d.date))
         .y((d) => y(d.repaid_amount))
@@ -514,9 +509,8 @@ function renderOverviewSmall(
     .style("fill", "none")
     .attr(
       "d",
-      d3
-        .line<InterestOverview>()
-        .curve(d3.curveMonotoneX)
+      line<InterestOverview>()
+        .curve(curveMonotoneX)
         .x((d) => x(d.date))
         .y((d) => y(d.drawn_amount + d.interest_amount - d.repaid_amount))
     );
