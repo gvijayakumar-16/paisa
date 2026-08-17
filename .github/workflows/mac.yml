@@ -9,19 +9,22 @@ on:
 
 jobs:
   mac-binary:
-    runs-on: macos-13
+    runs-on: macos-14
     steps:
     - uses: actions/checkout@v2.4.0
     - uses: actions/setup-node@v3
       with:
-        node-version: 22
+        node-version: 24
         cache: npm
     - uses: actions/setup-go@v4
       with:
-        go-version: '1.24.2'
+        go-version: '1.26.6'
     - run: |
         brew install --force --overwrite sqlite3 create-dmg
-        brew install --build-from-source --verbose ./ledger.rb
+        brew tap-new --no-git paisa/local
+        cp ledger.rb "$(brew --repository)/Library/Taps/paisa/homebrew-local/Formula/ledger.rb"
+        brew install --build-from-source --verbose paisa/local/ledger
+        "$(brew --prefix ledger)/bin/ledger" --version
         cp "$(brew --prefix ledger)/bin/ledger" internal/binary/ledger
         npm install
         npm run build
