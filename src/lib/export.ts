@@ -4,6 +4,7 @@ import Papa from "papaparse";
 export function download(balancedPostings: BalancedPosting[]) {
   const rows = balancedPostings.map((balancedPosting) => {
     return {
+      TransactionID: balancedPosting.from.transaction_id,
       Date: balancedPosting.from.date.toISOString(),
       Payee: balancedPosting.from.payee,
       FromAccount: balancedPosting.from.account,
