@@ -2,17 +2,23 @@ import type { AssetBreakdown, BalancedPosting } from "./utils";
 import Papa from "papaparse";
 
 export function downloadAssets(breakdowns: Record<string, AssetBreakdown>) {
-  const rows = Object.values(breakdowns).map((b) => ({
-    Account: b.group,
-    "Investment Amount": b.investmentAmount,
-    "Withdrawal Amount": b.withdrawalAmount,
-    "Balance Units": b.balanceUnits,
-    "Avg Buy Price": b.averageBuyPrice,
-    "Market Value": b.marketAmount,
-    Change: b.gainAmount,
-    XIRR: b.xirr,
-    "Absolute Return": b.absoluteReturn
-  }));
+  const ALLOWED_PREFIXES = ["Assets:Debt", "Assets:MutualFund", "Assets:Stocks"];
+  const rows = Object.values(breakdowns)
+    .filter(
+      (b) =>
+        ALLOWED_PREFIXES.some((p) => b.group.startsWith(p)) && b.balanceUnits >= 1
+    )
+    .map((b) => ({
+      Account: b.group,
+      "Investment Amount": b.investmentAmount,
+      "Withdrawal Amount": b.withdrawalAmount,
+      "Balance Units": b.balanceUnits,
+      "Avg Buy Price": b.averageBuyPrice,
+      "Market Value": b.marketAmount,
+      Change: b.gainAmount,
+      XIRR: b.xirr,
+      "Absolute Return": b.absoluteReturn
+    }));
 
   const csv = Papa.unparse(rows);
   const link = document.createElement("a");
