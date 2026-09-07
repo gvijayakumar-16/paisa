@@ -41,6 +41,7 @@ export interface PriceProvider {
 
 export interface Posting {
   id: string;
+  transaction_id: string;
   date: dayjs.Dayjs;
   payee: string;
   account: string;

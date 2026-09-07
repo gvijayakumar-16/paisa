@@ -1,5 +1,11 @@
 # CHANGELOG
 
+### 0.7.6 (2026-09-06)
+
+* Include transaction id in the export
+* Update Node.js and Go versions and remove Bun.
+* Fix the ledger formula and update fonts.
+
 ### 0.7.5 (2025-12-02)
 
 * Build fixes
