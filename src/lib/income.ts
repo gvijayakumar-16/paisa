@@ -144,11 +144,15 @@ function renderIncomeTimeline(incomes: Income[], id: string, timeFormat: string)
     .attr("data-tippy-content", (d) => {
       const postings: Posting[] = (d.data as any).postings;
       const total = _.sumBy(postings, (p) => -p.amount);
+      const groupedPostings = _.chain(postings)
+        .groupBy((p) => restName(p.account))
+        .map((ps, name) => [name, _.sumBy(ps, (p) => -p.amount)] as [string, number])
+        .value();
       return tooltip(
         _.sortBy(
-          postings.map((p) => [
-            restName(p.account),
-            [formatCurrency(-p.amount), "has-text-weight-bold has-text-right"]
+          groupedPostings.map(([name, amount]) => [
+            name,
+            [formatCurrency(amount), "has-text-weight-bold has-text-right"]
           ]),
           (r) => r[0]
         ),
