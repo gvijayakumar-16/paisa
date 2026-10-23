@@ -5,9 +5,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -316,4 +318,14 @@ func BuildSubPath(baseDirectory string, path string) (string, error) {
 	}
 
 	return fullpath, nil
+}
+
+// Glob matches a literal path followed by a glob pattern.
+func Glob(path, suffixPattern string) []string {
+	dir := filepath.Dir(path)
+	pattern := regexp.QuoteMeta(filepath.Base(path)) + suffixPattern
+	names, _ := fs.Glob(os.DirFS(dir), pattern)
+	return lo.Map(names, func(name string, _ int) string {
+		return filepath.Join(dir, name)
+	})
 }

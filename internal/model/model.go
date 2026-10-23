@@ -53,7 +53,7 @@ func SyncJournal(db *gorm.DB) (string, error) {
 
 		var message string
 		for _, error := range errors {
-			message += error.Message + "\n\n"
+			message += error.String() + "\n\n"
 		}
 		return strings.TrimRight(message, "\n"), err
 	}

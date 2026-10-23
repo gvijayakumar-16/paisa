@@ -1,4 +1,4 @@
-name: Mac OS Release
+name: Mac OS AMD64 Release
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
 
 jobs:
   mac-binary:
-    runs-on: macos-14
+    runs-on: macos-15-intel
     steps:
     - uses: actions/checkout@v2.4.0
     - uses: actions/setup-node@v3
@@ -23,6 +23,7 @@ jobs:
         brew install --force --overwrite sqlite3 create-dmg
         brew tap-new --no-git paisa/local
         cp ledger.rb "$(brew --repository)/Library/Taps/paisa/homebrew-local/Formula/ledger.rb"
+        brew install --overwrite python@3.12
         brew install --build-from-source --verbose paisa/local/ledger
         "$(brew --prefix ledger)/bin/ledger" --version
         cp "$(brew --prefix ledger)/bin/ledger" internal/binary/ledger
