@@ -332,6 +332,13 @@ func (Beancount) ValidateFile(journalPath string) ([]LedgerFileError, string, er
 	return errors, "", err
 }
 
+func parseBeancountNumber(value string) (decimal.Decimal, error) {
+	value = strings.TrimSpace(value)
+	value = strings.TrimPrefix(value, "Decimal('")
+	value = strings.TrimSuffix(value, "')")
+	return decimal.NewFromString(value)
+}
+
 func (Beancount) Parse(journalPath string, prices []price.Price) ([]*posting.Posting, error) {
 	pricesTree := buildPricesTree(prices)
 
@@ -351,6 +358,7 @@ func (Beancount) Parse(journalPath string, prices []price.Price) ([]*posting.Pos
 		Commodity
 		Quantity
 		Amount
+		CostCurrency
 		FileName
 		Location
 		TransactionID
@@ -358,7 +366,8 @@ func (Beancount) Parse(journalPath string, prices []price.Price) ([]*posting.Pos
 		TagRecurring
 		TagPeriod
 	)
-	args := []string{"-f", "csv", journalPath, "select date,payee,narration,account,currency,units(position),cost(position),filename,location,id,flag,ANY_META('recurring'),ANY_META('period')"}
+	// Stringify decimals to bypass bean-query's precision-losing numeric CSV renderer.
+	args := []string{"-f", "csv", journalPath, "select date,payee,narration,account,currency,str(number(units(position))),str(number(cost(position))),currency(cost(position)),filename,location,id,flag,ANY_META('recurring'),ANY_META('period')"}
 
 	path, err := binary.LookPath("bean-query")
 	if err != nil {
@@ -388,16 +397,17 @@ func (Beancount) Parse(journalPath string, prices []price.Price) ([]*posting.Pos
 			return nil, err
 		}
 
-		_, quantity, err := parseAmount(strings.TrimSpace(record[Quantity]))
+		quantity, err := parseBeancountNumber(record[Quantity])
 		if err != nil {
 			return nil, err
 		}
 
-		costCurrency, amount, err := parseAmount(strings.TrimSpace(record[Amount]))
+		amount, err := parseBeancountNumber(record[Amount])
 		if err != nil {
 			return nil, err
 		}
 
+		costCurrency := strings.TrimSpace(record[CostCurrency])
 		if costCurrency != config.DefaultCurrency() {
 			pr := lookupPrice(pricesTree, costCurrency, date)
 			if !pr.Equal(decimal.Zero) {
@@ -892,7 +902,6 @@ func buildHLedgerPostings(p HLedgerPosting, t HLedgerTransaction, pricesTree map
 				forecast = true
 			}
 		}
-		break
 	}
 
 	for _, tag := range p.Tags {
@@ -903,7 +912,6 @@ func buildHLedgerPostings(p HLedgerPosting, t HLedgerTransaction, pricesTree map
 		if len(tag) == 2 && tag[0] == "Period" {
 			tagPeriod = tag[1]
 		}
-		break
 	}
 
 	dir := filepath.Dir(config.GetJournalPath())

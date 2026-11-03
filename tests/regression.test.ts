@@ -7,6 +7,7 @@ import waitPort from "wait-port";
 import fs from "fs";
 import axios from "axios";
 import { diffString } from "json-diff";
+import type { LedgerFile } from "../src/lib/utils";
 
 const fixture = "tests/fixture";
 const port = 5700;
@@ -32,6 +33,7 @@ async function recordAndVerify(dir: string, route: string, name: string) {
     if (diff != "") {
       assert.fail(diff);
     }
+    return;
   }
   fs.writeFileSync(filename, JSON.stringify(data, null, 2));
 }
@@ -41,6 +43,20 @@ async function verifyApi(dir: string) {
     data: { success }
   } = await axios.post("/api/sync", { journal: true });
   assert.strictEqual(success, true);
+
+  const {
+    data: { config }
+  } = await axios.get("/api/config");
+  const extension = path.extname(config.journal_path);
+  for (const name of ["expenses", "expenses.txt"]) {
+    const { data } = await axios.post("/api/editor/save", {
+      name,
+      content: "",
+      operation: "create"
+    });
+    assert.strictEqual(data.saved, false);
+    assert.strictEqual(data.message, `File name must end with ${extension}`);
+  }
 
   await recordAndVerify(dir, "/api/dashboard", "dashboard");
   await recordAndVerify(dir, "/api/cash_flow", "cash_flow");
@@ -56,6 +72,7 @@ async function verifyApi(dir: string) {
   await recordAndVerify(dir, "/api/liabilities/balance", "liabilities_balance");
   await recordAndVerify(dir, "/api/liabilities/repayment", "liabilities_repayment");
   await recordAndVerify(dir, "/api/liabilities/interest", "liabilities_interest");
+  await recordAndVerify(dir, "/api/credit_cards", "credit_cards");
   await recordAndVerify(dir, "/api/income", "income");
   await recordAndVerify(dir, "/api/transaction", "transaction");
   await recordAndVerify(dir, "/api/editor/files", "files");
@@ -63,6 +80,27 @@ async function verifyApi(dir: string) {
   await recordAndVerify(dir, "/api/price", "price");
   await recordAndVerify(dir, "/api/diagnosis", "diagnosis");
   await recordAndVerify(dir, "/api/config", "config");
+
+  const {
+    data: { files }
+  } = await axios.get<{ files: LedgerFile[] }>("/api/editor/files");
+  for (const file of files) {
+    const { data } = await axios.post("/api/editor/validate", file);
+    assert.deepStrictEqual(data.errors, [], `Validation failed for ${file.name}`);
+  }
+
+  const mainFile = files.find((file) => file.name === path.basename(config.journal_path));
+  const { data: unnamed } = await axios.post("/api/editor/validate", { ...mainFile, name: "" });
+  assert.deepStrictEqual(
+    unnamed.errors,
+    [],
+    "Unnamed previews must use the main journal directory"
+  );
+
+  for (const name of [`../outside${extension}`, `nested/../../outside${extension}`, "."]) {
+    const { data } = await axios.post("/api/editor/validate", { name, content: "" });
+    assert.strictEqual(data.errors[0].message, "Invalid file name");
+  }
 }
 
 async function wait() {

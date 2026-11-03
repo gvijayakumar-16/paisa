@@ -2,6 +2,8 @@
   "accounts": [
     "Income:Salary:Acme",
     "Assets:Checking",
+    "Expenses:Shopping",
+    "Liabilities:CreditCard:HDFC",
     "Expenses:Rent",
     "Assets:Equity:NIFTY",
     "Assets:Equity:ABNB",
@@ -21,13 +23,35 @@
   "files": [
     {
       "name": "main.ledger",
-      "content": "commodity INR 9,99,99,999.00\n\nP 2022/01/07 00:00:00 NIFTY 100 INR\nP 2022/02/07 00:00:00 NIFTY 100.273 INR\n\n2022/01/01 Salary\n    Income:Salary:Acme                      -100,000 INR\n    Assets:Checking                          100,000 INR\n\n2022/01/03 Rent\n    Assets:Checking                          -20,000 INR\n    Expenses:Rent\n\n2022/01/06 Bonus\n    Income:Salary:Acme                       -20,000 INR\n    Assets:Checking                           20,000 INR\n\n2022/01/07 Investment\n    Assets:Checking                          -40,000 INR\n    Assets:Equity:NIFTY                          400 NIFTY @ 100 INR\n\n2022/01/08 Investment 2\n    Assets:Checking                          -30,000 INR\n    Assets:Equity:NIFTY                          300 NIFTY @@ 30,000 INR\n\n2022/01/08 Investment 3\n    Assets:Checking                          -10,000 INR\n    Assets:Equity:NIFTY                          100 NIFTY\n\n2022/01/08 Buy ABNB\n    Assets:Equity:ABNB                          0.76 ABNB @ 131.27 USD\n    Assets:Checking\n\n2022/01/09 Buy ABNB total price\n    Assets:Equity:ABNB                          0.76 ABNB @@ 99.7652 USD\n    Assets:Checking\n\n2022/01/08 Buy Apple\n    Assets:Equity:AAPL                           100 AAPL @ 100 INR\n    Assets:Checking\n\n2022/01/09 Sell\n    Assets:Equity:AAPL                          -100 AAPL @ 100 INR\n    Income:CapitalGains:Equity:AAPL            -27.3 INR\n    Assets:Checking                          10027.3 INR\n\n2022/01/09 Multi Currency Debit\n    Expenses:Charges                             100 INR\n    Assets:Dollar                                 10 USD\n    Assets:Checking\n\nP 2022/01/08 00:00:00 USD 80.442048 INR\n\n2022/01/31 Interest\n    ; Global note\n    ; :interest:\n    Income:Interest:Checking                  -1,000 INR ; Posting note\n    Assets:Checking\n\n2022/01/31 * Asset balance\n  Assets:Equity:NIFTY  =800 NIFTY\n",
+      "content": "include journals/*/*.ledger\n\nP 2022/01/07 00:00:00 NIFTY 100 INR\nP 2022/02/07 00:00:00 NIFTY 100.273 INR\n\n2022/01/01 Salary\n    Income:Salary:Acme                      -100,000 INR\n    Assets:Checking                          100,000 INR\n\n2022/01/03 Rent\n    Assets:Checking                          -20,000 INR\n    Expenses:Rent\n\n2022/01/06 Bonus\n    Income:Salary:Acme                       -20,000 INR\n    Assets:Checking                           20,000 INR\n\n2022/01/07 Investment\n    Assets:Checking                          -40,000 INR\n    Assets:Equity:NIFTY                          400 NIFTY @ 100 INR\n\n2022/01/08 Investment 2\n    Assets:Checking                          -30,000 INR\n    Assets:Equity:NIFTY                          300 NIFTY @@ 30,000 INR\n\n2022/01/08 Investment 3\n    Assets:Checking                          -10,000 INR\n    Assets:Equity:NIFTY                          100 NIFTY\n\n2022/01/08 Buy ABNB\n    Assets:Equity:ABNB                          0.76 ABNB @ 131.27 USD\n    Assets:Checking\n\n2022/01/09 Buy ABNB total price\n    Assets:Equity:ABNB                          0.76 ABNB @@ 99.7652 USD\n    Assets:Checking\n\n2022/01/08 Buy Apple\n    Assets:Equity:AAPL                           100 AAPL @ 100 INR\n    Assets:Checking\n\n2022/01/09 Sell\n    Assets:Equity:AAPL                          -100 AAPL @ 100 INR\n    Income:CapitalGains:Equity:AAPL            -27.3 INR\n    Assets:Checking                          10027.3 INR\n\n2022/01/09 Multi Currency Debit\n    Expenses:Charges                             100 INR\n    Assets:Dollar                                 10 USD\n    Assets:Checking\n\nP 2022/01/08 00:00:00 USD 80.442048 INR\n\n2022/01/31 Interest\n    ; Global note\n    ; :interest:\n    Income:Interest:Checking                  -1,000 INR ; Posting note\n    Assets:Checking\n\n2022/01/31 * Asset balance\n  Assets:Equity:NIFTY  =800 NIFTY\n\n; Regression #384: auto posting must not make forecast transactions visible.\n~ every month from 2022-03-05 to 2022-05-01  AutoPostingForecast\n    Income:Salary:Acme  -100 INR\n    Assets:Checking     100 INR\n\n= desc:AutoPostingForecast\n    (Assets:Checking)  *1\n",
+      "versions": [],
+      "operation": ""
+    },
+    {
+      "name": "journals/2021/credit-card.ledger",
+      "content": "; Regression #350: exact payment, one-unit shortfall, overpayment, and bank rounding.\n2021-10-01 Salary\n    Income:Salary:Acme           -20000 INR\n    Assets:Checking              20000 INR\n\n2021-10-20 Purchase\n    Expenses:Shopping              100 INR\n    Liabilities:CreditCard:HDFC    -100 INR\n\n2021-11-01 Exact payment\n    Assets:Checking               -100 INR\n    Liabilities:CreditCard:HDFC     100 INR\n\n2021-11-20 Purchase\n    Expenses:Shopping              100 INR\n    Liabilities:CreditCard:HDFC    -100 INR\n\n2021-12-01 One unit still due\n    Assets:Checking                -99 INR\n    Liabilities:CreditCard:HDFC      99 INR\n\n2021-12-20 Purchase\n    Expenses:Shopping              100 INR\n    Liabilities:CreditCard:HDFC    -100 INR\n\n2022-01-01 Overpayment\n    Assets:Checking               -102 INR\n    Liabilities:CreditCard:HDFC     102 INR\n\n2022-01-20 Purchase\n    Expenses:Shopping           14310.14 INR\n    Liabilities:CreditCard:HDFC  -14310.14 INR\n\n2022-02-01 Rounded bill payment\n    Assets:Checking             -14309 INR\n    Liabilities:CreditCard:HDFC   14309 INR\n",
+      "versions": [],
+      "operation": ""
+    },
+    {
+      "name": "journals/2022/bank.ledger",
+      "content": "include bank/*.ledger\n",
+      "versions": [],
+      "operation": ""
+    },
+    {
+      "name": "journals/2022/bank/checking.ledger",
+      "content": "commodity INR 9,99,99,999.00\n",
       "versions": [],
       "operation": ""
     }
   ],
   "payees": [
     "Salary",
+    "Purchase",
+    "Exact payment",
+    "One unit still due",
+    "Overpayment",
     "Rent",
     "Bonus",
     "Investment",
@@ -38,6 +62,8 @@
     "Buy ABNB total price",
     "Sell",
     "Multi Currency Debit",
-    "Interest"
+    "Interest",
+    "Rounded bill payment",
+    "AutoPostingForecast"
   ]
 }

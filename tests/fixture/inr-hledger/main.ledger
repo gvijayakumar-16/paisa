@@ -1,4 +1,4 @@
-commodity INR 9,99,99,999.00
+include journals/*/*.ledger
 
 P 2022/01/07 00:00:00 NIFTY 100 INR
 P 2022/02/07 00:00:00 NIFTY 100.273 INR
@@ -59,3 +59,11 @@ P 2022/01/08 00:00:00 USD 80.442048 INR
 
 2022/01/31 * Asset balance
   Assets:Equity:NIFTY  =800 NIFTY
+
+; Regression #384: auto posting must not make forecast transactions visible.
+~ every month from 2022-03-05 to 2022-05-01  AutoPostingForecast
+    Income:Salary:Acme  -100 INR
+    Assets:Checking     100 INR
+
+= desc:AutoPostingForecast
+    (Assets:Checking)  *1

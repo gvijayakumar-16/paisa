@@ -1,6 +1,17 @@
+import { max } from "d3-array";
 import { pie } from "d3-shape";
 import _ from "lodash";
-import { secondName, type Posting } from "./utils";
+import { formatCurrency, formatFixedWidthFloat, secondName, type Posting } from "./utils";
+
+export function formatBreakdownLabel(amount: number, total: number) {
+  return `${formatCurrency(amount)} ${formatFixedWidthFloat((amount / total) * 100, 6)}%`;
+}
+
+export function breakdownLabelWidth(labels: string[], minWidth = 135) {
+  // Monospace labels need about 8px per character, plus two characters of padding.
+  const length = max(labels, (label) => label.length) || 0;
+  return Math.max(minWidth, (length + 2) * 8);
+}
 
 export function pieData(expenses: Posting[]) {
   return pie<{ category: string; total: number }>()

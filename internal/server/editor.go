@@ -78,12 +78,15 @@ func DeleteBackups(file LedgerFile) gin.H {
 }
 
 func SaveFile(db *gorm.DB, file LedgerFile) gin.H {
+	path := config.GetJournalPath()
+	if extension := filepath.Ext(path); extension != "" && filepath.Ext(file.Name) != extension {
+		return gin.H{"errors": []ledger.LedgerFileError{}, "saved": false, "message": "File name must end with " + extension}
+	}
 	errors, _, err := validateFile(file)
 	if err != nil {
 		return gin.H{"errors": errors, "saved": false, "message": "Validation failed"}
 	}
 
-	path := config.GetJournalPath()
 	dir := filepath.Dir(path)
 
 	filePath, err := utils.BuildSubPath(dir, file.Name)
@@ -144,10 +147,21 @@ func ValidateFile(file LedgerFile) gin.H {
 
 func validateFile(file LedgerFile) ([]ledger.LedgerFileError, string, error) {
 	path := config.GetJournalPath()
+	if file.Name != "" {
+		filePath, err := utils.BuildSubPath(filepath.Dir(path), file.Name)
+		if err != nil || filePath == filepath.Clean(filepath.Dir(path)) {
+			return []ledger.LedgerFileError{{LineFrom: 1, LineTo: 1, Message: "Invalid file name"}}, "", os.ErrInvalid
+		}
+		path = filePath
+	}
+
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		return []ledger.LedgerFileError{{LineFrom: 1, LineTo: 1, Message: err.Error()}}, "", err
+	}
 
 	tmpfile, err := os.CreateTemp(filepath.Dir(path), "paisa-tmp-")
 	if err != nil {
-		log.Fatal(err)
+		return []ledger.LedgerFileError{{LineFrom: 1, LineTo: 1, Message: err.Error()}}, "", err
 	}
 
 	defer os.Remove(tmpfile.Name())
