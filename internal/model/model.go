@@ -3,7 +3,6 @@ package model
 import (
 	"fmt"
 	"strings"
-	"sync"
 
 	"github.com/ananthakumaran/paisa/internal/config"
 	"github.com/ananthakumaran/paisa/internal/ledger"
@@ -18,7 +17,6 @@ import (
 	"github.com/ananthakumaran/paisa/internal/scraper"
 	"github.com/ananthakumaran/paisa/internal/scraper/india"
 	"github.com/ananthakumaran/paisa/internal/scraper/mutualfund"
-	"github.com/samber/lo"
 	log "github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
@@ -75,51 +73,67 @@ func SyncJournal(db *gorm.DB) (string, error) {
 	return "", nil
 }
 
-// fetchConcurrency bounds how many price providers are hit at once.
-// ponytail: fixed cap, revisit if a provider starts rate-limiting us.
-const fetchConcurrency = 8
+func SyncCommodities(db *gorm.DB) ([]string, error) {
+	conf := config.GetConfig()
+	commodities, err := conf.OrderedPriceCommodities()
+	if err != nil {
+		return nil, err
+	}
 
-type commodityFetchResult struct {
-	commodity config.Commodity
-	prices    []*price.Price
-	err       error
-}
-
-func SyncCommodities(db *gorm.DB) error {
 	AutoMigrate(db)
 	log.Info("Fetching commodities price history")
-	commodities := lo.Shuffle(commodity.All())
 
-	// Fetching is pure network IO with no shared state, so it's done
-	// concurrently. Writes go through sequentially afterwards on the
-	// caller's goroutine since sqlite only supports one writer at a time.
-	results := make([]commodityFetchResult, len(commodities))
-	sem := make(chan struct{}, fetchConcurrency)
-	var wg sync.WaitGroup
-	for i, c := range commodities {
-		wg.Add(1)
-		go func(i int, c config.Commodity) {
-			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
-
-			log.Info("Fetching commodity ", c.Name)
-			provider := scraper.GetProviderByCode(c.Price.Provider)
-			prices, err := provider.GetPrices(c.Price.Code, c.Name)
-			results[i] = commodityFetchResult{commodity: c, prices: prices, err: err}
-		}(i, c)
+	dependencies := make(map[string]bool)
+	for _, commodity := range commodities {
+		quote := commodity.Price.QuoteCommodity(conf.DefaultCurrency)
+		if quote != conf.DefaultCurrency {
+			dependencies[quote] = true
+		}
 	}
-	wg.Wait()
+	histories := make(map[string]priceHistory)
 
 	var errors []error
-	for _, result := range results {
-		if result.err != nil {
-			log.Error(result.err)
-			errors = append(errors, fmt.Errorf("Failed to fetch price for %s: %w", result.commodity.Name, result.err))
+	var warnings []string
+	for _, commodity := range commodities {
+		name := commodity.Name
+		quote := commodity.Price.QuoteCommodity(conf.DefaultCurrency)
+		exchange, available := histories[quote]
+		if quote != conf.DefaultCurrency && !available {
+			err := fmt.Errorf("Skipped price for %s: quote commodity %s did not update successfully", name, quote)
+			log.Error(err)
+			errors = append(errors, err)
 			continue
 		}
 
-		price.UpsertAllByTypeNameAndID(db, result.commodity.Type, result.commodity.Name, result.commodity.Price.Code, result.prices)
+		log.Info("Fetching commodity ", name)
+		provider := scraper.GetProviderByCode(commodity.Price.Provider)
+		raw, err := provider.GetPrices(commodity.Price.Code, name)
+		if err != nil {
+			log.Error(err)
+			errors = append(errors, fmt.Errorf("Failed to fetch price for %s: %w", name, err))
+			continue
+		}
+
+		prices, gap, err := normalizeCommodityPrices(commodity, raw, exchange, conf.DefaultCurrency)
+		if err != nil {
+			log.Error(err)
+			errors = append(errors, fmt.Errorf("Failed to convert price for %s: %w", name, err))
+			continue
+		}
+		if gap.Count > 0 {
+			warning := fmt.Sprintf("%s: %s", name, gap)
+			warnings = append(warnings, warning)
+			log.Warn(warning)
+		}
+
+		if err := price.UpsertAllByTypeAndName(db, commodity.Type, name, prices); err != nil {
+			log.Error(err)
+			errors = append(errors, fmt.Errorf("Failed to store price for %s: %w", name, err))
+			continue
+		}
+		if dependencies[name] {
+			histories[name] = newPriceHistory(prices)
+		}
 	}
 
 	if len(errors) > 0 {
@@ -127,9 +141,9 @@ func SyncCommodities(db *gorm.DB) error {
 		for _, error := range errors {
 			message += error.Error() + "\n"
 		}
-		return fmt.Errorf("%s", strings.Trim(message, "\n"))
+		return warnings, fmt.Errorf("%s", strings.Trim(message, "\n"))
 	}
-	return nil
+	return warnings, nil
 }
 
 func SyncCII(db *gorm.DB) error {
@@ -149,7 +163,7 @@ func SyncPortfolios(db *gorm.DB) error {
 	log.Info("Fetching commodities portfolio")
 	commodities := commodity.FindByType(config.MutualFund)
 	for _, commodity := range commodities {
-		if commodity.Price.Provider != "in-mfapi" {
+		if commodity.Price.Provider != "in-mfapi" && commodity.Price.Provider != "com-finbodhi-mutualfund" {
 			continue
 		}
 

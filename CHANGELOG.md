@@ -1,5 +1,53 @@
 # CHANGELOG
 
+### Unreleased
+
+### 0.8.0 (2026-11-15)
+
+* Choose the currency of downloaded investment prices for every price provider.
+* Add a `currency` commodity type for exchange rates.
+* Add FinBodhi providers for stocks, mutual funds, and SIFs.
+* Rename Purified Bytes price providers to FinBodhi and migrate existing configuration codes.
+* Report incomplete exchange-rate settings and missing historical rates.
+* Fix silver prices being 100 times too high ([#353](https://github.com/ananthakumaran/paisa/issues/353)). Select **Update Prices** to refresh existing prices.
+* Skip investment-return calculations for checking accounts.
+* Fix payment statuses for rounded credit-card bills and double-counted budget rollovers in projected balances.
+* Fix expense chart label overlaps and budget amount styling.
+* Fix Beancount commodities containing digits and hledger forecast detection with automatic postings.
+* Fix validation of nested journal includes, reject journal filenames with mismatched extensions, and support import columns beyond Z and locale-aware number formats.
+
+#### Breaking Changes :rotating_light:
+
+**Yahoo and Alpha Vantage users need to check their price settings.**
+You now choose the currency in which prices are supplied, and add an
+exchange rate when it differs from the currency used in your reports.
+
+For example, suppose your reports use INR and you own Apple shares.
+Yahoo supplies Apple's price in USD. Set it up as follows:
+
+1. Under **Configuration → Commodities**, open Apple's price settings.
+   Set **Quote commodity** to **USD**. This field means “the currency of
+   the price supplied by the provider.”
+2. Add another entry named **USD**, with **Type: currency**. Choose
+   **Yahoo Finance** as its price provider and **USDINR=X** as its code.
+   This supplies the number of rupees worth one dollar.
+3. Save the configuration.
+4. Select **Update Prices** from the top-right menu.
+
+If an investment's price is already in the currency used in your reports,
+leave **Quote commodity** empty.
+
+MFAPI and FinBodhi's Indian mutual funds, NPS, SIFs, and metals supply
+prices in INR. If your reports use another currency, choose **INR** in
+their price settings and add the corresponding exchange rate. See the
+[example for USD reports](https://paisa.fyi/reference/commodities/#reporting-in-another-currency).
+
+FinBodhi's US stocks and GIFT City funds are quoted in USD. Use **USD**
+as their quote commodity and add an exchange rate if needed.
+
+Your existing transactions, including purchases written as `@ 100 USD`,
+can stay unchanged. Keep any exchange rates already written in your journal.
+
 ### 0.7.8 (2026-10-21)
 
 * Fix path traversal allowing file reads and backup deletion outside the ledger and sheet directories ([#420](https://github.com/ananthakumaran/paisa/issues/420)).
