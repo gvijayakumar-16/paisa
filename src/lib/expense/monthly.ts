@@ -434,8 +434,11 @@ export function renderMonthlyExpensesTimeline(
   return { z: z, destroy: destroy, legends };
 }
 
-export function renderCurrentExpensesBreakdown(z: ScaleOrdinal<string, string, never>) {
-  const id = "#d3-current-month-breakdown";
+export function renderCurrentExpensesBreakdown(
+  z: ScaleOrdinal<string, string, never>,
+  id = "#d3-current-month-breakdown",
+  group = "Expenses"
+) {
   const BAR_HEIGHT = rem(20);
   const svg = select(id),
     margin = { top: 0, right: rem(25), bottom: rem(20), left: rem(100) },
@@ -495,7 +498,7 @@ export function renderCurrentExpensesBreakdown(z: ScaleOrdinal<string, string, n
 
     yAxis
       .transition(t)
-      .call(axisLeft(y).tickFormat((g) => iconify(g, { group: "Expenses", suffix: true })));
+      .call(axisLeft(y).tickFormat((g) => iconify(g, { group, suffix: true })));
 
     const tooltipContent = (d: Point) => {
       const total = _.sumBy(d.postings, (p) => p.amount);

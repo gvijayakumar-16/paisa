@@ -81,6 +81,14 @@
       ]
     },
     {
+      label: "Investments",
+      href: "/investments",
+      children: [
+        { label: "Monthly", href: "/monthly", monthPicker: true },
+        { label: "Yearly", href: "/yearly", financialYearPicker: true }
+      ]
+    },
+    {
       label: "Assets",
       href: "/assets",
       children: [

@@ -1012,7 +1012,7 @@ export function forEachFinancialYear(
   return years;
 }
 
-function beginningOfFinancialYear(date: dayjs.Dayjs) {
+export function beginningOfFinancialYear(date: dayjs.Dayjs) {
   date = date.startOf("month");
   if (date.month() + 1 < USER_CONFIG.financial_year_starting_month) {
     return date
